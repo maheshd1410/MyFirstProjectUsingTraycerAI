@@ -1,0 +1,2 @@
+// Stripe configuration placeholder
+export {};

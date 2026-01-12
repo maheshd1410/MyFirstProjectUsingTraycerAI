@@ -1,0 +1,2 @@
+// Navigation configuration placeholder
+export {};

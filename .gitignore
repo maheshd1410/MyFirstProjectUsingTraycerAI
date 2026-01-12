@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Expo / React Native
+.mobile-build/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
