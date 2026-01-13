@@ -1,4 +1,5 @@
 import { prisma } from '../src/config/database';
+import { Prisma } from '@prisma/client';
 import bcrypt from 'bcrypt';
 
 async function main() {
@@ -48,7 +49,7 @@ async function main() {
           categoryId: categories[0].id,
           name: 'Motichur Ladoo',
           description: 'Delicious motichur ladoo made with ghee and dried milk solids',
-          price: '250.00',
+          price: new Prisma.Decimal('250.00'),
           unit: 'PIECE',
           stockQuantity: 50,
           lowStockThreshold: 10,
@@ -64,7 +65,7 @@ async function main() {
           categoryId: categories[0].id,
           name: 'Besan Ladoo',
           description: 'Traditional besan ladoo with a perfect blend of spices',
-          price: '200.00',
+          price: new Prisma.Decimal('200.00'),
           unit: 'PIECE',
           stockQuantity: 75,
           lowStockThreshold: 15,
@@ -81,8 +82,8 @@ async function main() {
           categoryId: categories[1].id,
           name: 'Premium Peda Ladoo',
           description: 'Premium peda ladoo made with finest khoya and ghee',
-          price: '350.00',
-          discountPrice: '300.00',
+          price: new Prisma.Decimal('350.00'),
+          discountPrice: new Prisma.Decimal('300.00'),
           unit: 'PIECE',
           stockQuantity: 30,
           lowStockThreshold: 8,
@@ -151,8 +152,10 @@ async function main() {
     console.log(`✓ Created address for customer`);
 
     // Create cart for customer
-    const cart = await prisma.cart.create({
-      data: {
+    const cart = await prisma.cart.upsert({
+      where: { userId: customerUser.id },
+      update: {},
+      create: {
         userId: customerUser.id,
       },
     });

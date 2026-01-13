@@ -1,2 +1,2 @@
-// Placeholder for shared UI components
-export {};
+export { Input } from './Input';
+export { Button } from './Button';

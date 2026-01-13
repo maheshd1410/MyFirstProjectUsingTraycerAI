@@ -1,2 +1,1 @@
-// Custom hooks placeholder
-export {};
+export { useAuth, useRequireAuth } from './useAuth';
