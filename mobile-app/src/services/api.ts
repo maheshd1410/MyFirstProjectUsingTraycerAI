@@ -1,5 +1,39 @@
+/**
+ * Axios API Service with Automatic Token Refresh
+ * 
+ * Token Flow Architecture:
+ * 1. Storage ↔ Redux Sync:
+ *    - AsyncStorage: saveTokens() → loads via getAccessToken(), getRefreshToken()
+ *    - Redux: loadUserFromStorage() thunk syncs storage with Redux state on app start
+ *    - Components: useAuth() hook accesses tokens from Redux state
+ * 
+ * 2. Request Flow:
+ *    - Request interceptor: Attaches access token from AsyncStorage to Authorization header
+ *    - All API calls use: Authorization: Bearer <accessToken>
+ * 
+ * 3. Token Refresh Flow (on 401):
+ *    - Response interceptor detects 401 error
+ *    - Queues concurrent requests (prevents multiple simultaneous refreshes)
+ *    - POST /api/auth/refresh-token with stored refreshToken
+ *    - Backend validates stored token, rotates both tokens, returns both
+ *    - saveTokens() persists new tokens to AsyncStorage
+ *    - Redux state updated via refreshAccessToken thunk (if dispatched separately)
+ *    - Retries original request with new accessToken
+ *    - Queued requests released with new token
+ * 
+ * 4. Logout & Error Handling:
+ *    - clearTokens() removes from AsyncStorage and Redux
+ *    - Failed refresh dispatches logoutUser() thunk for full reset
+ *    - Navigation to login handled by RootNavigator watching isAuthenticated
+ * 
+ * 5. Protected Routes & Role-Based Access:
+ *    - useAuth() returns isAuthenticated flag
+ *    - useRequireAuth(role?) enforces role-based guards
+ *    - RootNavigator shows AuthNavigator if !isAuthenticated, AppNavigator otherwise
+ */
+
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
-import { getAccessToken, getRefreshToken, clearTokens } from '../utils/tokenStorage';
+import { getAccessToken, getRefreshToken, saveTokens, clearTokens } from '../utils/tokenStorage';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:3000/api';
 
@@ -77,7 +111,12 @@ api.interceptors.response.use(
 
         const { accessToken, refreshToken: newRefreshToken } = response.data;
         
-        // Save both tokens to AsyncStorage
+        // Log if new refresh token missing (backend should always return it)
+        if (!newRefreshToken) {
+          console.warn('[Token Refresh] Backend did not return new refresh token, using previous token');
+        }
+        
+        // Save both tokens to AsyncStorage with fallback to previous refresh token
         await saveTokens(accessToken, newRefreshToken || refreshToken);
         
         // Update the original request with the new access token
@@ -90,8 +129,9 @@ api.interceptors.response.use(
       } catch (refreshError) {
         // Refresh failed - logout user
         await clearTokens();
+        console.error('[Token Refresh] Refresh failed, tokens cleared:', refreshError);
         // Dispatch logout action or navigate to login
-        // This should be handled in the Redux store
+        // This should be handled in the Redux store via Redux middleware or listener
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
