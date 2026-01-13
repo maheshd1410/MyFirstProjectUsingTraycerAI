@@ -97,4 +97,21 @@ export class AuthService {
 
     return user;
   }
+
+  /**
+   * Verify refresh token matches the stored token for a user
+   */
+  async verifyStoredRefreshToken(userId: string, providedToken: string): Promise<boolean> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { refreshToken: true },
+    });
+
+    if (!user || !user.refreshToken) {
+      return false;
+    }
+
+    // Compare the provided token with the stored token
+    return user.refreshToken === providedToken;
+  }
 }

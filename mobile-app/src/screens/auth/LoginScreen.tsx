@@ -7,15 +7,16 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import { useAuth } from '../../hooks';
 import { Input, Button } from '../../components';
 import { theme } from '../../theme';
+import { AuthStackParamList } from '../../navigation/AuthNavigator';
 
-interface LoginScreenProps {
-  onNavigateToRegister?: () => void;
-}
+type LoginScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Login'>;
 
 const validationSchema = Yup.object().shape({
   email: Yup.string()
@@ -26,7 +27,8 @@ const validationSchema = Yup.object().shape({
     .required('Password is required'),
 });
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }) => {
+export const LoginScreen: React.FC = () => {
+  const navigation = useNavigation<LoginScreenNavigationProp>();
   const { login, isLoading, error: authError } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
 
@@ -100,7 +102,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
 
       <View style={styles.footer}>
         <Text style={styles.footerText}>Don't have an account? </Text>
-        <TouchableOpacity onPress={onNavigateToRegister} disabled={isLoading}>
+        <TouchableOpacity onPress={() => navigation.navigate('Register')} disabled={isLoading}>
           <Text style={styles.footerLink}>Sign Up</Text>
         </TouchableOpacity>
       </View>

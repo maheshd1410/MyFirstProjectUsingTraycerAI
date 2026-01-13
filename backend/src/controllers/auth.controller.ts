@@ -103,16 +103,30 @@ export const refreshToken = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Refresh token required' });
     }
 
-    // Verify refresh token
+    // Verify refresh token signature
     const decoded = verifyRefreshToken(token);
 
     // Get user
     const user = await authService.getUserById(decoded.userId);
 
-    // Generate new access token
-    const accessToken = generateAccessToken(user.id, user.role);
+    // Validate that the provided token matches the stored token
+    const isStoredTokenValid = await authService.verifyStoredRefreshToken(decoded.userId, token);
+    if (!isStoredTokenValid) {
+      return res.status(401).json({ error: 'Invalid refresh token - token does not match stored value' });
+    }
 
-    return res.status(200).json({ accessToken });
+    // Generate new access token and refresh token (token rotation)
+    const newAccessToken = generateAccessToken(user.id, user.role);
+    const newRefreshToken = generateRefreshToken(user.id);
+
+    // Save new refresh token in database
+    await authService.updateRefreshToken(user.id, newRefreshToken);
+
+    // Return both tokens
+    return res.status(200).json({
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Token refresh failed';
     return res.status(401).json({ error: message });

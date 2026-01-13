@@ -75,7 +75,12 @@ api.interceptors.response.use(
           refreshToken,
         });
 
-        const { accessToken } = response.data;
+        const { accessToken, refreshToken: newRefreshToken } = response.data;
+        
+        // Save both tokens to AsyncStorage
+        await saveTokens(accessToken, newRefreshToken || refreshToken);
+        
+        // Update the original request with the new access token
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
 
         // Notify all pending requests

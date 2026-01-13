@@ -6,15 +6,16 @@ import {
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import { useAuth } from '../../hooks';
 import { Input, Button } from '../../components';
 import { theme } from '../../theme';
+import { AuthStackParamList } from '../../navigation/AuthNavigator';
 
-interface RegisterScreenProps {
-  onNavigateToLogin?: () => void;
-}
+type RegisterScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Register'>;
 
 const validationSchema = Yup.object().shape({
   firstName: Yup.string()
@@ -37,9 +38,8 @@ const validationSchema = Yup.object().shape({
     .required('Confirm password is required'),
 });
 
-export const RegisterScreen: React.FC<RegisterScreenProps> = ({
-  onNavigateToLogin,
-}) => {
+export const RegisterScreen: React.FC = () => {
+  const navigation = useNavigation<RegisterScreenNavigationProp>();
   const { register, isLoading, error: authError } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -213,7 +213,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
 
       <View style={styles.footer}>
         <Text style={styles.footerText}>Already have an account? </Text>
-        <TouchableOpacity onPress={onNavigateToLogin} disabled={isLoading}>
+        <TouchableOpacity onPress={() => navigation.navigate('Login')} disabled={isLoading}>
           <Text style={styles.footerLink}>Login</Text>
         </TouchableOpacity>
       </View>

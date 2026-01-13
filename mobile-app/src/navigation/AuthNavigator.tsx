@@ -2,7 +2,6 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { LoginScreen } from '../screens/auth/LoginScreen';
 import { RegisterScreen } from '../screens/auth/RegisterScreen';
-import { theme } from '../theme';
 
 export type AuthStackParamList = {
   Login: undefined;
@@ -12,10 +11,7 @@ export type AuthStackParamList = {
 
 const Stack = createNativeStackNavigator<AuthStackParamList>();
 
-export const AuthNavigator: React.FC<{
-  onNavigateToLogin?: () => void;
-  onNavigateToRegister?: () => void;
-}> = ({ onNavigateToLogin, onNavigateToRegister }) => {
+export const AuthNavigator: React.FC = () => {
   return (
     <Stack.Navigator
       screenOptions={{
@@ -29,7 +25,6 @@ export const AuthNavigator: React.FC<{
         options={{
           animationTypeForReplace: 'pop',
         }}
-        initialParams={{ onNavigateToRegister }}
       />
       <Stack.Screen
         name="Register"
@@ -37,7 +32,6 @@ export const AuthNavigator: React.FC<{
         options={{
           animationTypeForReplace: 'fade',
         }}
-        initialParams={{ onNavigateToLogin }}
       />
     </Stack.Navigator>
   );
