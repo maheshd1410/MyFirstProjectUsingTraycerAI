@@ -1,0 +1,315 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum UserRole {
+  CUSTOMER
+  ADMIN
+}
+
+enum ProductUnit {
+  KG
+  GRAM
+  PIECE
+  BOX
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CARD
+  UPI
+  COD
+  WALLET
+}
+
+enum ModerationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum NotificationType {
+  ORDER_UPDATE
+  PROMOTION
+  REVIEW
+  GENERAL
+}
+
+// Models
+model User {
+  id              String    @id @default(uuid())
+  email           String    @unique @db.VarChar(255)
+  password        String
+  firstName       String
+  lastName        String
+  phoneNumber     String    @unique @db.VarChar(20)
+  role            UserRole  @default(CUSTOMER)
+  isActive        Boolean   @default(true)
+  emailVerified   Boolean   @default(false)
+  profileImage    String?
+  fcmToken        String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  addresses       Address[]
+  orders          Order[]
+  reviews         Review[]
+  cart            Cart?
+  notifications   Notification[]
+
+  @@index([email])
+  @@index([phoneNumber])
+  @@index([role])
+}
+
+model Address {
+  id              String    @id @default(uuid())
+  userId          String
+  fullName        String
+  phoneNumber     String    @db.VarChar(20)
+  addressLine1    String
+  addressLine2    String?
+  city            String
+  state           String
+  postalCode      String    @db.VarChar(10)
+  country         String
+  isDefault       Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders          Order[]
+
+  @@index([userId])
+  @@index([userId, isDefault])
+}
+
+model Category {
+  id              String    @id @default(uuid())
+  name            String    @unique @db.VarChar(255)
+  description     String?   @db.Text
+  imageUrl        String?
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  products        Product[]
+
+  @@index([name])
+  @@index([isActive])
+}
+
+model Product {
+  id                  String    @id @default(uuid())
+  categoryId          String
+  name                String    @db.VarChar(255)
+  description         String?   @db.Text
+  price               Decimal   @db.Decimal(10, 2)
+  discountPrice       Decimal?  @db.Decimal(10, 2)
+  images              String[]
+  weight              Float?
+  unit                ProductUnit
+  stockQuantity       Int
+  lowStockThreshold   Int       @default(5)
+  isActive            Boolean   @default(true)
+  isFeatured          Boolean   @default(false)
+  averageRating       Decimal   @default(0) @db.Decimal(3, 2)
+  totalReviews        Int       @default(0)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  // Relations
+  category            Category  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  orderItems          OrderItem[]
+  reviews             Review[]
+  cartItems           CartItem[]
+
+  @@index([categoryId])
+  @@index([isActive])
+  @@index([isFeatured])
+  @@index([averageRating, isActive])
+}
+
+model Cart {
+  id              String    @id @default(uuid())
+  userId          String    @unique
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items           CartItem[]
+
+  @@index([userId])
+}
+
+model CartItem {
+  id              String    @id @default(uuid())
+  cartId          String
+  productId       String
+  quantity        Int
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  cart            Cart      @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product         Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([cartId, productId])
+  @@index([cartId])
+  @@index([productId])
+}
+
+model Order {
+  id                      String    @id @default(uuid())
+  orderNumber             String    @unique @db.VarChar(50)
+  userId                  String
+  addressId               String
+  status                  OrderStatus @default(PENDING)
+  paymentStatus           PaymentStatus @default(PENDING)
+  paymentMethod           PaymentMethod?
+  subtotal                Decimal   @db.Decimal(12, 2)
+  taxAmount               Decimal   @db.Decimal(10, 2)
+  deliveryCharge          Decimal   @db.Decimal(10, 2)
+  discountAmount          Decimal   @db.Decimal(10, 2)
+  totalAmount             Decimal   @db.Decimal(12, 2)
+  specialInstructions     String?   @db.Text
+  estimatedDeliveryDate   DateTime?
+  deliveredAt             DateTime?
+  cancelledAt             DateTime?
+  cancellationReason      String?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  // Relations
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  address                 Address   @relation(fields: [addressId], references: [id], onDelete: Restrict)
+  items                   OrderItem[]
+  payment                 Payment?
+  reviews                 Review[]
+
+  @@index([userId])
+  @@index([orderNumber])
+  @@index([status])
+  @@index([createdAt])
+  @@index([userId, status])
+}
+
+model OrderItem {
+  id              String    @id @default(uuid())
+  orderId         String
+  productId       String
+  productName     String    @db.VarChar(255)
+  productImage    String?
+  quantity        Int
+  unitPrice       Decimal   @db.Decimal(10, 2)
+  totalPrice      Decimal   @db.Decimal(12, 2)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  order           Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product         Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model Payment {
+  id                      String    @id @default(uuid())
+  orderId                 String    @unique
+  stripePaymentIntentId   String?   @unique
+  amount                  Decimal   @db.Decimal(12, 2)
+  currency                String    @default("INR") @db.VarChar(3)
+  status                  PaymentStatus @default(PENDING)
+  paymentMethod           String?
+  transactionId           String?
+  failureReason           String?
+  refundedAmount          Decimal?  @db.Decimal(12, 2)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  // Relations
+  order                   Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([stripePaymentIntentId])
+  @@index([status])
+}
+
+model Review {
+  id                      String    @id @default(uuid())
+  userId                  String
+  productId               String
+  orderId                 String
+  rating                  Int
+  title                   String?
+  comment                 String?   @db.Text
+  images                  String[]
+  isVerifiedPurchase      Boolean   @default(false)
+  isModerated             Boolean   @default(true)
+  moderationStatus        ModerationStatus @default(PENDING)
+  moderationNote          String?
+  helpfulCount            Int       @default(0)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  // Relations
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product                 Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  order                   Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId, orderId])
+  @@index([productId])
+  @@index([userId])
+  @@index([rating])
+  @@index([productId, moderationStatus])
+}
+
+model Notification {
+  id              String    @id @default(uuid())
+  userId          String
+  title           String
+  body            String    @db.Text
+  type            NotificationType
+  data            Json?
+  isRead          Boolean   @default(false)
+  sentAt           DateTime  @default(now())
+  readAt          DateTime?
+  createdAt       DateTime  @default(now())
+
+  // Relations
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([userId, isRead, createdAt])
+}
