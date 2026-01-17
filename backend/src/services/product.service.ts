@@ -1,12 +1,15 @@
 import { prisma } from '../config/database';
 import { CreateProductDTO, UpdateProductDTO, ProductFilterDTO, ProductResponse } from '../types';
 import { cacheService } from './cache.service';
+import { searchService } from './search.service';
+import { searchAnalyticsService } from './search-analytics.service';
 import logger from '../config/logger';
 import crypto from 'crypto';
 
 // TTL constants (in seconds)
 const PRODUCT_DETAIL_TTL = 3600; // 1 hour
 const PRODUCT_LIST_TTL = 600; // 10 minutes
+const SEARCH_RESULTS_TTL = 300; // 5 minutes
 const FEATURED_PRODUCTS_TTL = 1800; // 30 minutes
 const CATEGORY_PRODUCTS_TTL = 900; // 15 minutes
 
@@ -41,7 +44,7 @@ export class ProductService {
     });
 
     // Invalidate product list caches
-    await cacheService.invalidateByTags(['products', 'product-list', 'featured']);
+    await cacheService.invalidateByTags(['products', 'product-list', 'featured', 'search']);
 
     return this.formatProductResponse(product);
   }
@@ -91,7 +94,7 @@ export class ProductService {
     });
 
     // Invalidate product-specific and list caches
-    await cacheService.invalidateByTags(['product', `product:${id}`, 'products', 'product-list', 'featured']);
+    await cacheService.invalidateByTags(['product', `product:${id}`, 'products', 'product-list', 'featured', 'search']);
 
     return this.formatProductResponse(updated);
   }
@@ -111,7 +114,7 @@ export class ProductService {
     });
 
     // Invalidate product-specific and list caches
-    await cacheService.invalidateByTags(['product', `product:${id}`, 'products', 'product-list']);
+    await cacheService.invalidateByTags(['product', `product:${id}`, 'products', 'product-list', 'search']);
   }
 
   async getProductById(id: string): Promise<ProductResponse> {
@@ -152,6 +155,23 @@ export class ProductService {
     page: number;
     pageSize: number;
   }> {
+    const {
+      page = 1,
+      pageSize = 10,
+      search = '',
+      categoryId = null,
+      minPrice = 0,
+      maxPrice,
+      sortBy = 'newest',
+      inStock,
+      minRating,
+    } = filters;
+
+    // Use full-text search for search terms longer than 2 characters
+    if (search && search.trim().length > 2) {
+      return this.searchProducts(search, filters);
+    }
+
     // Generate cache key based on filters
     const filterHash = crypto.createHash('md5').update(JSON.stringify(filters)).digest('hex');
     const cacheKey = `products:list:${filterHash}`;
@@ -169,18 +189,6 @@ export class ProductService {
       return cached;
     }
 
-    const {
-      page = 1,
-      pageSize = 10,
-      search = '',
-      categoryId = null,
-      minPrice = 0,
-      maxPrice,
-      sortBy = 'newest',
-      inStock,
-      minRating,
-    } = filters;
-
     const skip = (page - 1) * pageSize;
 
     // Build filter conditions
@@ -188,7 +196,7 @@ export class ProductService {
       isActive: true,
     };
 
-    if (search) {
+    if (search && search.trim().length <= 2) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
         { description: { contains: search, mode: 'insensitive' } },
@@ -263,6 +271,76 @@ export class ProductService {
     const tags = categoryId ? ['products', 'product-list', `category:${categoryId}`] : ['products', 'product-list'];
     await cacheService.set(cacheKey, result, {
       ttl: PRODUCT_LIST_TTL,
+      tags,
+    });
+
+    return result;
+  }
+
+  private async searchProducts(search: string, filters: ProductFilterDTO): Promise<{
+    products: ProductResponse[];
+    total: number;
+    page: number;
+    pageSize: number;
+  }> {
+    const {
+      page = 1,
+      pageSize = 10,
+      categoryId = null,
+      minPrice = 0,
+      maxPrice,
+      inStock,
+      minRating,
+    } = filters;
+
+    // Generate cache key for search results
+    const filterHash = crypto.createHash('md5').update(JSON.stringify({ search, ...filters })).digest('hex');
+    const cacheKey = `search:results:${filterHash}`;
+
+    // Try to get from cache first with shorter TTL for search results
+    const cached = await cacheService.get<{
+      products: ProductResponse[];
+      total: number;
+      page: number;
+      pageSize: number;
+    }>(cacheKey);
+
+    if (cached) {
+      logger.debug('Search results cache hit', { search, filters });
+      return cached;
+    }
+
+    const skip = (page - 1) * pageSize;
+
+    // Use search service for full-text search
+    const { results: searchResults, total } = await searchService.searchProducts(search, {
+      categoryId: categoryId || undefined,
+      minPrice,
+      maxPrice,
+      minRating,
+      inStock,
+      limit: pageSize,
+      offset: skip,
+    });
+
+    // Track search analytics
+    await searchAnalyticsService.trackSearch(
+      search,
+      total,
+      filters.userId || undefined
+    );
+
+    const result = {
+      products: searchResults.map((p) => this.formatProductResponse(p)),
+      total,
+      page,
+      pageSize,
+    };
+
+    // Cache search results with shorter TTL
+    const tags = categoryId ? ['products', 'search', `category:${categoryId}`] : ['products', 'search'];
+    await cacheService.set(cacheKey, result, {
+      ttl: SEARCH_RESULTS_TTL,
       tags,
     });
 
@@ -366,7 +444,7 @@ export class ProductService {
     });
 
     // Invalidate product cache including list/featured caches for in-stock filtering
-    await cacheService.invalidateByTags(['product', `product:${id}`, 'products', 'product-list', 'featured']);
+    await cacheService.invalidateByTags(['product', `product:${id}`, 'products', 'product-list', 'featured', 'search']);
 
     return this.formatProductResponse(updated);
   }
@@ -386,7 +464,7 @@ export class ProductService {
       });
 
       // Invalidate product cache
-      await cacheService.invalidateByTags(['product', `product:${productId}`, 'products']);
+      await cacheService.invalidateByTags(['product', `product:${productId}`, 'products', 'search']);
       return;
     }
 
@@ -402,7 +480,7 @@ export class ProductService {
     });
 
     // Invalidate product cache
-    await cacheService.invalidateByTags(['product', `product:${productId}`, 'products']);
+    await cacheService.invalidateByTags(['product', `product:${productId}`, 'products', 'search']);
   }
 
   private formatProductResponse(product: any): ProductResponse {

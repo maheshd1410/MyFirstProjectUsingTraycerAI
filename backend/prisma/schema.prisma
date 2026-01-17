@@ -107,6 +107,7 @@ model User {
   notifications   Notification[]
   wishlist        Wishlist[]
   emailLogs       EmailLog[]
+  productViews    ProductView[]
 
   @@index([email])
   @@index([phoneNumber])
@@ -177,11 +178,14 @@ model Product {
   reviews             Review[]
   cartItems           CartItem[]
   wishlistItems       Wishlist[]
+  views               ProductView[]
 
   @@index([categoryId])
   @@index([isActive])
   @@index([isFeatured])
   @@index([averageRating, isActive])
+  @@index([categoryId, price, isActive])
+  @@index([categoryId, averageRating, isActive])
 }
 
 model Wishlist {
@@ -378,4 +382,22 @@ model EmailLog {
   @@index([status])
   @@index([emailType])
   @@index([createdAt])
+}
+
+model ProductView {
+  id          String    @id @default(uuid())
+  productId   String
+  userId      String?
+  sessionId   String
+  ipAddress   String?   @db.VarChar(45)
+  userAgent   String?   @db.Text
+  createdAt   DateTime  @default(now())
+
+  // Relations
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([productId, createdAt])
+  @@index([sessionId])
+  @@index([userId])
 }

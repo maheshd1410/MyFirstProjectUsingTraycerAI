@@ -66,6 +66,48 @@ class CacheWarmerService {
   }
 
   /**
+   * Warm search cache with popular search terms
+   */
+  async warmSearchCache(): Promise<void> {
+    try {
+      const startTime = Date.now();
+      
+      // Import dynamically to avoid circular dependencies
+      const { searchAnalyticsService } = await import('./search-analytics.service');
+      const { productService } = await import('./product.service');
+      
+      // Get top 20 popular search terms
+      const popularSearches = await searchAnalyticsService.getPopularSearches(20);
+      
+      if (popularSearches.length === 0) {
+        logger.info('No popular searches found to warm cache');
+        return;
+      }
+
+      // Pre-cache search results for popular terms
+      const cachePromises = popularSearches.map(({ term }) =>
+        productService.getAllProducts({
+          search: term,
+          page: 1,
+          pageSize: 20,
+        }).catch(error => {
+          logger.error('Failed to warm search cache for term', { term, error });
+        })
+      );
+
+      await Promise.allSettled(cachePromises);
+      
+      const duration = Date.now() - startTime;
+      logger.info('Search cache warmed', {
+        duration: `${duration}ms`,
+        terms: popularSearches.length,
+      });
+    } catch (error) {
+      logger.error('Failed to warm search cache', { error });
+    }
+  }
+
+  /**
    * Warm all caches
    */
   async warmAll(): Promise<void> {
@@ -78,6 +120,7 @@ class CacheWarmerService {
       this.warmFeaturedProducts(),
       this.warmCategories(),
       this.warmPopularProducts(),
+      this.warmSearchCache(),
     ]);
 
     // Count successes and failures

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { cacheService } from '../services/cache.service';
 import { cacheMetricsService } from '../services/cache-metrics.service';
+import { adminService } from '../services/admin.service';
 
 const prisma = new PrismaClient();
 
@@ -128,7 +129,7 @@ export const adminController = {
           return {
             ...user,
             orderCount: user._count.orders,
-            totalSpent: parseFloat(totalSpent._sum.totalAmount || '0'),
+            totalSpent: Number(totalSpent._sum.totalAmount || 0),
           };
         })
       );
@@ -162,7 +163,7 @@ export const adminController = {
           role: true,
           isActive: true,
           createdAt: true,
-          phone: true,
+          phoneNumber: true,
         },
       });
 
@@ -183,13 +184,13 @@ export const adminController = {
       });
 
       const avgOrderValue =
-        totalSpent._count > 0 ? parseFloat(totalSpent._sum.totalAmount || '0') / totalSpent._count : 0;
+        totalSpent._count > 0 ? Number(totalSpent._sum.totalAmount || 0) / totalSpent._count : 0;
 
       res.json({
         user,
         statistics: {
           totalOrders: totalSpent._count,
-          totalSpent: parseFloat(totalSpent._sum.totalAmount || '0'),
+          totalSpent: Number(totalSpent._sum.totalAmount || 0),
           averageOrderValue: avgOrderValue,
         },
         recentOrders: orders,
@@ -274,7 +275,7 @@ export const adminController = {
       const revenueByDate: Record<string, number> = {};
       orders.forEach((order) => {
         const date = order.createdAt.toISOString().split('T')[0];
-        revenueByDate[date] = (revenueByDate[date] || 0) + parseFloat(order.totalAmount);
+        revenueByDate[date] = (revenueByDate[date] || 0) + Number(order.totalAmount);
       });
 
       // Total users
@@ -290,7 +291,7 @@ export const adminController = {
       });
 
       res.json({
-        totalRevenue: parseFloat(revenueData._sum.totalAmount || '0'),
+        totalRevenue: Number(revenueData._sum.totalAmount || 0),
         totalOrders: ordersByStatus.reduce((acc, item) => acc + item._count, 0),
         totalUsers,
         activeUsers,
@@ -365,6 +366,263 @@ export const adminController = {
       });
     } catch (error) {
       res.status(500).json({ error: 'Failed to clear cache by pattern' });
+    }
+  },
+
+  // Revenue Analytics Endpoints
+  getRevenueTrendsReport: async (req: Request, res: Response) => {
+    try {
+      const { startDate, endDate, groupBy } = req.query;
+      
+      const start = new Date(startDate as string);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(endDate as string);
+      end.setHours(23, 59, 59, 999);
+      const group = (groupBy as 'day' | 'week' | 'month') || 'day';
+
+      const trends = await adminService.getRevenueTrends(start, end, group);
+
+      res.json({
+        success: true,
+        data: { trends },
+        metadata: {
+          startDate: start.toISOString(),
+          endDate: end.toISOString(),
+          groupBy: group,
+        },
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        success: false, 
+        error: 'Failed to fetch revenue trends' 
+      });
+    }
+  },
+
+  getSalesSummaryReport: async (req: Request, res: Response) => {
+    try {
+      const { startDate, endDate } = req.query;
+      const start = new Date(startDate as string);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(endDate as string);
+      end.setHours(23, 59, 59, 999);
+
+      const [revenueByCategory, topProducts, orderStats, revenueTrends] = await Promise.all([
+        adminService.getRevenueByCategory(start, end),
+        adminService.getTopProductsByRevenue(start, end, 10),
+        adminService.getOrderStatistics(start, end),
+        adminService.getRevenueTrends(start, end, 'day'),
+      ]);
+
+      const totalRevenue = revenueTrends.reduce((sum: number, t: any) => sum + t.revenue, 0);
+      const totalOrders = revenueTrends.reduce((sum: number, t: any) => sum + t.orderCount, 0);
+      const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
+      res.json({
+        success: true,
+        data: {
+          summary: {
+            totalRevenue,
+            totalOrders,
+            avgOrderValue,
+          },
+          revenueByCategory,
+          topProducts,
+          orderStats,
+        },
+        metadata: {
+          startDate: start.toISOString(),
+          endDate: end.toISOString(),
+        },
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        success: false, 
+        error: 'Failed to fetch sales summary' 
+      });
+    }
+  },
+
+  getCustomerInsightsReport: async (req: Request, res: Response) => {
+    try {
+      const { startDate, endDate, limit } = req.query;
+      const start = new Date(startDate as string);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(endDate as string);
+      end.setHours(23, 59, 59, 999);
+      const customerLimit = parseInt(limit as string) || 10;
+
+      const [segmentation, lifetimeValue, topCustomers] = await Promise.all([
+        adminService.getCustomerSegmentation(start, end),
+        adminService.getCustomerLifetimeValue(),
+        adminService.getTopCustomers(customerLimit, start, end),
+      ]);
+
+      res.json({
+        success: true,
+        data: {
+          segmentation,
+          lifetimeValue,
+          topCustomers,
+        },
+        metadata: {
+          startDate: start.toISOString(),
+          endDate: end.toISOString(),
+          limit: customerLimit,
+        },
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        success: false, 
+        error: 'Failed to fetch customer insights' 
+      });
+    }
+  },
+
+  getProductPerformanceReport: async (req: Request, res: Response) => {
+    try {
+      const { startDate, endDate, limit, threshold } = req.query;
+      const start = new Date(startDate as string);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(endDate as string);
+      end.setHours(23, 59, 59, 999);
+      const productLimit = parseInt(limit as string) || 10;
+      const stockThreshold = threshold ? parseInt(threshold as string) : undefined;
+
+      const [topProducts, lowStockProducts, revenueByCategory] = await Promise.all([
+        adminService.getTopProductsByRevenue(start, end, productLimit),
+        adminService.getLowStockProducts(stockThreshold),
+        adminService.getRevenueByCategory(start, end),
+      ]);
+
+      res.json({
+        success: true,
+        data: {
+          topProducts,
+          lowStockProducts,
+          categoryPerformance: revenueByCategory,
+        },
+        metadata: {
+          startDate: start.toISOString(),
+          endDate: end.toISOString(),
+          limit: productLimit,
+        },
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        success: false, 
+        error: 'Failed to fetch product performance' 
+      });
+    }
+  },
+
+  getConversionFunnelReport: async (req: Request, res: Response) => {
+    try {
+      const { startDate, endDate } = req.query;
+      const start = new Date(startDate as string);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(endDate as string);
+      end.setHours(23, 59, 59, 999);
+
+      const [conversionMetrics, orderStats] = await Promise.all([
+        adminService.getConversionMetrics(start, end),
+        adminService.getOrderStatistics(start, end),
+      ]);
+
+      res.json({
+        success: true,
+        data: {
+          conversion: conversionMetrics,
+          orders: orderStats,
+        },
+        metadata: {
+          startDate: start.toISOString(),
+          endDate: end.toISOString(),
+        },
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        success: false, 
+        error: 'Failed to fetch conversion funnel data' 
+      });
+    }
+  },
+
+  getProductAnalytics: async (req: Request, res: Response) => {
+    try {
+      const { productId } = req.params;
+      const { startDate, endDate } = req.query;
+      
+      const start = new Date(startDate as string);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(endDate as string);
+      end.setHours(23, 59, 59, 999);
+
+      // Verify product exists
+      const product = await prisma.product.findUnique({
+        where: { id: productId },
+        select: { id: true, name: true, isActive: true },
+      });
+
+      if (!product) {
+        return res.status(404).json({ 
+          success: false, 
+          error: 'Product not found' 
+        });
+      }
+
+      const metrics = await adminService.getProductPerformanceMetrics(
+        productId,
+        start,
+        end
+      );
+
+      res.json({
+        success: true,
+        data: {
+          product: {
+            id: product.id,
+            name: product.name,
+            isActive: product.isActive,
+          },
+          metrics,
+        },
+        metadata: {
+          startDate: start.toISOString(),
+          endDate: end.toISOString(),
+        },
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        success: false, 
+        error: 'Failed to fetch product analytics' 
+      });
+    }
+  },
+
+  // Refresh materialized views for analytics
+  refreshAnalyticsViews: async (req: Request, res: Response) => {
+    try {
+      const startTime = Date.now();
+
+      // Call the refresh function created in the migration
+      await prisma.$executeRaw`SELECT refresh_analytics_views()`;
+
+      const duration = Date.now() - startTime;
+
+      res.json({
+        success: true,
+        message: 'Analytics views refreshed successfully',
+        metadata: {
+          duration: `${duration}ms`,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: 'Failed to refresh analytics views',
+      });
     }
   },
 };

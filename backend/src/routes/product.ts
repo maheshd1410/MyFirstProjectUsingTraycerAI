@@ -8,6 +8,7 @@ import {
   updateProduct,
   deleteProduct,
   uploadProductImages,
+  getSearchSuggestions,
 } from '../controllers/product.controller';
 import { authenticate, requireRole } from '../middleware/auth';
 import { upload, uploadErrorHandler } from '../middleware/upload';
@@ -81,6 +82,68 @@ const router = Router();
  *               $ref: '#/components/schemas/PaginatedProducts'
  */
 router.get('/', cacheProductList(600), getAllProducts);
+
+/**
+ * @swagger
+ * /api/products/search/suggestions:
+ *   get:
+ *     summary: Get search suggestions (autocomplete)
+ *     tags: [Products]
+ *     parameters:
+ *       - in: query
+ *         name: q
+ *         required: true
+ *         schema:
+ *           type: string
+ *           minLength: 2
+ *           maxLength: 50
+ *         description: Search query (minimum 2 characters)
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 20
+ *           default: 10
+ *         description: Maximum number of suggestions
+ *     responses:
+ *       200:
+ *         description: List of search suggestions
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 suggestions:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       text:
+ *                         type: string
+ *                       type:
+ *                         type: string
+ *                         enum: [product, category]
+ *                       score:
+ *                         type: number
+ *                       productId:
+ *                         type: string
+ *                       categoryId:
+ *                         type: string
+ *             example:
+ *               suggestions:
+ *                 - text: "Chocolate Chip Cookies"
+ *                   type: "product"
+ *                   score: 0.95
+ *                   productId: "abc123"
+ *                 - text: "Cookies & Biscuits"
+ *                   type: "category"
+ *                   score: 0.85
+ *                   categoryId: "def456"
+ *       400:
+ *         description: Invalid query parameters
+ */
+router.get('/search/suggestions', cacheMiddleware({ ttl: 1800 }), getSearchSuggestions);
 
 /**
  * @swagger

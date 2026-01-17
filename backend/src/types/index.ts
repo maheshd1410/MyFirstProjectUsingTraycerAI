@@ -147,6 +147,27 @@ export interface ProductFilterDTO {
   sortBy?: 'newest' | 'price-asc' | 'price-desc' | 'rating';
   inStock?: boolean;
   minRating?: number;
+  userId?: string;
+}
+
+export interface EnhancedProductFilterDTO extends ProductFilterDTO {
+  useFullTextSearch?: boolean;
+  fuzzyMatch?: boolean;
+}
+
+export interface SearchSuggestion {
+  text: string;
+  type: 'product' | 'category';
+  score: number;
+  productId?: string;
+  categoryId?: string;
+}
+
+export interface SearchResultMetadata {
+  query: string;
+  totalResults: number;
+  searchTime: number;
+  suggestions?: string[];
 }
 
 export interface ProductResponse {

@@ -3,6 +3,9 @@ import { productService } from '../services/product.service';
 import { CreateProductDTO, UpdateProductDTO, ProductFilterDTO } from '../types';
 import cloudinary from '../config/cloudinary';
 import { Readable } from 'stream';
+import { searchService } from '../services/search.service';
+import { productViewService } from '../services/product-view.service';
+import { v4 as uuidv4 } from 'uuid';
 
 export const getAllProducts = async (req: Request, res: Response) => {
   try {
@@ -16,6 +19,7 @@ export const getAllProducts = async (req: Request, res: Response) => {
       sortBy: (req.query.sortBy as any) || 'newest',
       inStock: req.query.inStock === 'true',
       minRating: req.query.minRating ? parseFloat(req.query.minRating as string) : undefined,
+      userId: (req as any).user?.userId,
     };
 
     const result = await productService.getAllProducts(filters);
@@ -29,6 +33,17 @@ export const getProductById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const product = await productService.getProductById(id);
+    
+    // Track product view asynchronously (fire and forget)
+    const sessionId = (req as any).session?.id || uuidv4();
+    productViewService.trackView({
+      productId: id,
+      userId: (req as any).user?.id,
+      sessionId,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+    }).catch(() => {}); // Silently fail - views are non-critical
+    
     res.json(product);
   } catch (error: any) {
     if (error.message === 'Product not found') {
@@ -95,6 +110,27 @@ export const deleteProduct = async (req: Request, res: Response) => {
     } else {
       res.status(500).json({ error: 'Failed to delete product' });
     }
+  }
+};
+
+export const getSearchSuggestions = async (req: Request, res: Response) => {
+  try {
+    const q = req.query.q as string;
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
+
+    if (!q || q.trim().length < 2) {
+      return res.status(400).json({ error: 'Search query must be at least 2 characters' });
+    }
+
+    if (limit < 1 || limit > 20) {
+      return res.status(400).json({ error: 'Limit must be between 1 and 20' });
+    }
+
+    const suggestions = await searchService.generateSearchSuggestions(q.trim(), limit);
+    res.json({ suggestions });
+  } catch (error: any) {
+    console.error('Search suggestions error:', error);
+    res.status(500).json({ error: 'Failed to fetch search suggestions' });
   }
 };
 
