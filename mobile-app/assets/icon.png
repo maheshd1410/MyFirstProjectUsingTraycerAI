@@ -1,0 +1,18 @@
+<svg width="1024" height="1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="1024" height="1024" fill="#FF9500"/>
+  
+  <!-- Ladoo Circle -->
+  <circle cx="512" cy="512" r="350" fill="#FFB84D" stroke="#FF8C00" stroke-width="10"/>
+  
+  <!-- Inner texture circles -->
+  <circle cx="420" cy="420" r="30" fill="#FFA726" opacity="0.6"/>
+  <circle cx="580" cy="380" r="25" fill="#FFA726" opacity="0.6"/>
+  <circle cx="620" cy="520" r="35" fill="#FFA726" opacity="0.6"/>
+  <circle cx="450" cy="580" r="28" fill="#FFA726" opacity="0.6"/>
+  <circle cx="550" cy="600" r="32" fill="#FFA726" opacity="0.6"/>
+  
+  <!-- Text -->
+  <text x="512" y="900" font-family="Arial, sans-serif" font-size="80" font-weight="bold" fill="#FFFFFF" text-anchor="middle">Ladoo</text>
+  <text x="512" y="980" font-family="Arial, sans-serif" font-size="60" fill="#FFFFFF" text-anchor="middle">Business</text>
+</svg>

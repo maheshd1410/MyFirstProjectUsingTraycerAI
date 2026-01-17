@@ -2,6 +2,15 @@ import { configureStore, ThunkAction, Action } from '@reduxjs/toolkit';
 import { persistStore, persistReducer } from 'redux-persist';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import authReducer from './auth/authSlice';
+import productReducer from './product/productSlice';
+import cartReducer from './cart/cartSlice';
+import wishlistReducer from './wishlist/wishlistSlice';
+import addressReducer from './address/addressSlice';
+import orderReducer from './order/orderSlice';
+import notificationReducer from './notification/notificationSlice';
+import profileReducer from './profile/profileSlice';
+import reviewReducer from './review/reviewSlice';
+import adminReducer from './admin/adminSlice';
 
 // Redux persist configuration
 const persistConfig = {
@@ -17,6 +26,15 @@ const persistedAuthReducer = persistReducer(persistConfig, authReducer);
 export const store = configureStore({
   reducer: {
     auth: persistedAuthReducer,
+    product: productReducer,
+    cart: cartReducer,
+    wishlist: wishlistReducer,
+    address: addressReducer,
+    order: orderReducer,
+    profile: profileReducer,
+    notification: notificationReducer,
+    review: reviewReducer,
+    admin: adminReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

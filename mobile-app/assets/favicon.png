@@ -1,0 +1,6 @@
+<svg width="48" height="48" xmlns="http://www.w3.org/2000/svg">
+  <!-- Simple favicon -->
+  <rect width="48" height="48" fill="#FF9500"/>
+  <circle cx="24" cy="24" r="16" fill="#FFB84D"/>
+  <text x="24" y="32" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#FFFFFF" text-anchor="middle">L</text>
+</svg>

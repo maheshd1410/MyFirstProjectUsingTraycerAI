@@ -1,2 +1,5 @@
 export * as authService from './auth.service';
-export { default as api } from './api';
+export * as productService from './product.service';
+export * as orderService from './order.service';
+export * as reviewService from './review.service';
+export * from './payment.service';

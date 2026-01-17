@@ -8,8 +8,9 @@ import {
   selectIsAuthenticated,
   selectAuthLoading,
   selectAuthError,
+  setUser as setUserAction,
 } from '../store/auth/authSlice';
-import { LoginCredentials, RegisterData, UserRole } from '../types';
+import { LoginCredentials, RegisterData, UserRole, User } from '../types';
 
 export const useAuth = () => {
   const dispatch = useAppDispatch();
@@ -36,6 +37,13 @@ export const useAuth = () => {
     return dispatch(logoutUser());
   }, [dispatch]);
 
+  const setUser = useCallback(
+    (user: User) => {
+      dispatch(setUserAction(user));
+    },
+    [dispatch]
+  );
+
   const isAdmin = user?.role === 'ADMIN';
   const isCustomer = user?.role === 'CUSTOMER';
 
@@ -49,6 +57,7 @@ export const useAuth = () => {
     login,
     register,
     logout,
+    setUser,
   };
 };
 

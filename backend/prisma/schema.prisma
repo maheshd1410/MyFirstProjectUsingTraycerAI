@@ -60,6 +60,22 @@ enum NotificationType {
   GENERAL
 }
 
+enum EmailType {
+  WELCOME
+  ORDER_CONFIRMATION
+  ORDER_STATUS_UPDATE
+  ORDER_DELIVERED
+  ORDER_CANCELLED
+  PASSWORD_RESET
+}
+
+enum EmailStatus {
+  PENDING
+  SENT
+  FAILED
+  BOUNCED
+}
+
 // Models
 model User {
   id              String    @id @default(uuid())
@@ -74,6 +90,12 @@ model User {
   profileImage    String?
   fcmToken        String?
   refreshToken    String?
+  notificationPrefsOrderUpdates  Boolean   @default(true)
+  notificationPrefsPromotions    Boolean   @default(true)
+  notificationPrefsReviews       Boolean   @default(true)
+  failedLoginAttempts Int       @default(0)
+  lockedUntil     DateTime?
+  lastFailedLogin DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -83,6 +105,8 @@ model User {
   reviews         Review[]
   cart            Cart?
   notifications   Notification[]
+  wishlist        Wishlist[]
+  emailLogs       EmailLog[]
 
   @@index([email])
   @@index([phoneNumber])
@@ -152,11 +176,27 @@ model Product {
   orderItems          OrderItem[]
   reviews             Review[]
   cartItems           CartItem[]
+  wishlistItems       Wishlist[]
 
   @@index([categoryId])
   @@index([isActive])
   @@index([isFeatured])
   @@index([averageRating, isActive])
+}
+
+model Wishlist {
+  id         String   @id @default(uuid())
+  userId     String
+  productId  String
+  createdAt  DateTime @default(now())
+
+  // Relations
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([userId])
+  @@index([productId])
 }
 
 model Cart {
@@ -313,4 +353,29 @@ model Notification {
   @@index([userId])
   @@index([isRead])
   @@index([userId, isRead, createdAt])
+}
+
+model EmailLog {
+  id              String        @id @default(uuid())
+  userId          String?
+  recipientEmail  String        @db.VarChar(255)
+  recipientName   String?
+  subject         String
+  emailType       EmailType
+  status          EmailStatus   @default(PENDING)
+  templateData    Json?
+  sentAt          DateTime?
+  failedAt        DateTime?
+  errorMessage    String?       @db.Text
+  retryCount      Int           @default(0)
+  maxRetries      Int           @default(3)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  user            User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([status])
+  @@index([emailType])
+  @@index([createdAt])
 }

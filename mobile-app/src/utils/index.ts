@@ -1,2 +1,2 @@
-// Utility functions placeholder
-export {};
+// Utility functions
+export * from './searchHistory';

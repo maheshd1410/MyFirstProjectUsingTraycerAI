@@ -178,3 +178,47 @@ export const getCurrentUser = async (req: Request, res: Response) => {
     return res.status(500).json({ error: message });
   }
 };
+
+/**
+ * Update FCM token for push notifications
+ * PUT /api/auth/fcm-token
+ */
+export const updateFcmToken = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { fcmToken } = req.body;
+
+    if (!fcmToken || typeof fcmToken !== 'string') {
+      return res.status(400).json({ error: 'Valid FCM token is required' });
+    }
+
+    await authService.updateFcmToken(req.user.userId, fcmToken);
+
+    return res.status(200).json({ message: 'FCM token updated successfully' });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to update FCM token';
+    return res.status(500).json({ error: message });
+  }
+};
+
+/**
+ * Remove FCM token (on logout)
+ * DELETE /api/auth/fcm-token
+ */
+export const removeFcmToken = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    await authService.updateFcmToken(req.user.userId, null);
+
+    return res.status(200).json({ message: 'FCM token removed successfully' });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to remove FCM token';
+    return res.status(500).json({ error: message });
+  }
+};

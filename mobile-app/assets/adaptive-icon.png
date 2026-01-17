@@ -1,0 +1,15 @@
+<svg width="1024" height="1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- Foreground for adaptive icon (keep within safe zone - center 66%) -->
+  <circle cx="512" cy="512" r="300" fill="#FF9500"/>
+  <circle cx="512" cy="512" r="280" fill="#FFB84D"/>
+  
+  <!-- Inner texture -->
+  <circle cx="440" cy="440" r="25" fill="#FFA726" opacity="0.6"/>
+  <circle cx="570" cy="410" r="20" fill="#FFA726" opacity="0.6"/>
+  <circle cx="590" cy="530" r="30" fill="#FFA726" opacity="0.6"/>
+  <circle cx="460" cy="560" r="22" fill="#FFA726" opacity="0.6"/>
+  <circle cx="530" cy="590" r="28" fill="#FFA726" opacity="0.6"/>
+  
+  <!-- L letter -->
+  <text x="512" y="580" font-family="Arial, sans-serif" font-size="280" font-weight="bold" fill="#FFFFFF" text-anchor="middle">L</text>
+</svg>

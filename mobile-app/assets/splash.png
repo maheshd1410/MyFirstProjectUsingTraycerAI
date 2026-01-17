@@ -1,0 +1,19 @@
+<svg width="1242" height="2436" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="1242" height="2436" fill="#FFFFFF"/>
+  
+  <!-- Large Ladoo Circle -->
+  <circle cx="621" cy="1100" r="300" fill="#FF9500"/>
+  <circle cx="621" cy="1100" r="280" fill="#FFB84D"/>
+  
+  <!-- Inner texture -->
+  <circle cx="550" cy="1030" r="25" fill="#FFA726" opacity="0.6"/>
+  <circle cx="680" cy="1000" r="20" fill="#FFA726" opacity="0.6"/>
+  <circle cx="700" cy="1120" r="30" fill="#FFA726" opacity="0.6"/>
+  <circle cx="570" cy="1150" r="22" fill="#FFA726" opacity="0.6"/>
+  <circle cx="640" cy="1180" r="28" fill="#FFA726" opacity="0.6"/>
+  
+  <!-- Text -->
+  <text x="621" y="1500" font-family="Arial, sans-serif" font-size="120" font-weight="bold" fill="#FF9500" text-anchor="middle">Ladoo Business</text>
+  <text x="621" y="1620" font-family="Arial, sans-serif" font-size="60" fill="#666666" text-anchor="middle">Your Sweet Shop Solution</text>
+</svg>

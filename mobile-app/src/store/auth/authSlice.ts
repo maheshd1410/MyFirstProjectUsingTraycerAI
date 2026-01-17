@@ -1,5 +1,7 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
+import * as Notifications from 'expo-notifications';
 import * as authService from '../../services/auth.service';
+import * as notificationService from '../../services/notification.service';
 import * as tokenStorage from '../../utils/tokenStorage';
 import { AuthState, User, LoginCredentials, RegisterData } from '../../types';
 
@@ -13,6 +15,28 @@ const initialState: AuthState = {
 };
 
 /**
+ * Register FCM token after successful login/register
+ */
+const registerFcmToken = async () => {
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status === 'granted') {
+      // Get native device push token (FCM token for Android, APNs for iOS)
+      const deviceToken = await Notifications.getDevicePushTokenAsync();
+      // Extract the FCM token from the platform-specific response
+      const fcmToken = deviceToken.data;
+      if (fcmToken) {
+        console.log('Registering FCM token with backend:', fcmToken);
+        await notificationService.registerFcmToken(fcmToken);
+      }
+    }
+  } catch (error) {
+    console.error('Failed to register FCM token:', error);
+    // Don't throw - FCM registration failure shouldn't break login
+  }
+};
+
+/**
  * Async thunk for login
  */
 export const loginUser = createAsyncThunk(
@@ -21,6 +45,10 @@ export const loginUser = createAsyncThunk(
     try {
       const response = await authService.login(credentials);
       await tokenStorage.saveTokens(response.accessToken, response.refreshToken);
+      
+      // Register FCM token after successful login
+      await registerFcmToken();
+      
       return response;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.error || 'Login failed');
@@ -37,6 +65,10 @@ export const registerUser = createAsyncThunk(
     try {
       const response = await authService.register(data);
       await tokenStorage.saveTokens(response.accessToken, response.refreshToken);
+      
+      // Register FCM token after successful registration
+      await registerFcmToken();
+      
       return response;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.error || 'Registration failed');
@@ -51,6 +83,9 @@ export const logoutUser = createAsyncThunk(
   'auth/logoutUser',
   async (_, { rejectWithValue }) => {
     try {
+      // Remove FCM token before logout
+      await notificationService.removeFcmToken();
+      
       await authService.logout();
       await tokenStorage.clearTokens();
       return null;
@@ -122,6 +157,9 @@ const authSlice = createSlice({
       state.refreshToken = null;
       state.isAuthenticated = false;
       state.error = null;
+    },
+    setUser: (state, action) => {
+      state.user = action.payload;
     },
   },
   extraReducers: (builder) => {
@@ -212,7 +250,7 @@ const authSlice = createSlice({
   },
 });
 
-export const { clearError, resetAuth } = authSlice.actions;
+export const { clearError, resetAuth, setUser } = authSlice.actions;
 export default authSlice.reducer;
 
 // Selectors

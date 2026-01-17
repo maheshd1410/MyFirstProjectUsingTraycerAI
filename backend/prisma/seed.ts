@@ -9,20 +9,20 @@ async function main() {
     // Create categories
     const categories = await Promise.all([
       prisma.category.upsert({
-        where: { name: 'Traditional Ladoos' },
+        where: { name: 'Sweets' },
         update: {},
         create: {
-          name: 'Traditional Ladoos',
-          description: 'Authentic traditional Indian ladoos made with authentic recipes',
+          name: 'Sweets',
+          description: 'Traditional Indian sweets and ladoos made with authentic recipes',
           isActive: true,
         },
       }),
       prisma.category.upsert({
-        where: { name: 'Premium Ladoos' },
+        where: { name: 'Snacks' },
         update: {},
         create: {
-          name: 'Premium Ladoos',
-          description: 'Premium quality ladoos with finest ingredients',
+          name: 'Snacks',
+          description: 'Savory snacks and namkeen for all occasions',
           isActive: true,
         },
       }),
@@ -31,7 +31,7 @@ async function main() {
         update: {},
         create: {
           name: 'Festival Specials',
-          description: 'Special ladoos for festivals and celebrations',
+          description: 'Special ladoos and sweets for festivals and celebrations',
           isActive: true,
         },
       }),
@@ -79,7 +79,7 @@ async function main() {
         update: {},
         create: {
           id: 'prod_peda_001',
-          categoryId: categories[1].id,
+          categoryId: categories[2].id,
           name: 'Premium Peda Ladoo',
           description: 'Premium peda ladoo made with finest khoya and ghee',
           price: new Prisma.Decimal('350.00'),
@@ -134,7 +134,11 @@ async function main() {
 
     console.log(`✓ Created sample customer: ${customerUser.email}`);
 
-    // Create address for customer
+    // Create address for customer (idempotent)
+    await prisma.address.deleteMany({
+      where: { userId: customerUser.id },
+    });
+
     const address = await prisma.address.create({
       data: {
         userId: customerUser.id,
