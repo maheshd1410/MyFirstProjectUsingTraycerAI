@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { AppError } from '../utils/errors';
 import logger, { logError } from '../config/logger';
 
@@ -21,7 +21,7 @@ const sanitizeBody = (body: any): any => {
 
 export const errorHandler = (err: any, req: Request, res: Response, next: NextFunction) => {
   // Generate error ID for tracking
-  const errorId = uuidv4();
+  const errorId = randomUUID();
   
   // Base error metadata
   const errorMetadata: Record<string, any> = {

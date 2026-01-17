@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import logger from '../config/logger';
 
 // Extend Express Request type to include id and startTime
@@ -23,7 +23,7 @@ export const requestLogger = (req: Request, res: Response, next: NextFunction) =
   }
 
   // Generate unique request ID
-  req.id = uuidv4();
+  req.id = randomUUID();
   req.startTime = Date.now();
 
   // Log incoming request

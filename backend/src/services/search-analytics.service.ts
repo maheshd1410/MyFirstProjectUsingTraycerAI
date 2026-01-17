@@ -16,6 +16,9 @@ class SearchAnalyticsService {
   ): Promise<void> {
     try {
       const redis = getRedisClient();
+      if (!redis) {
+        return;
+      }
       
       // Increment popular searches counter
       await redis.zincrby(this.POPULAR_SEARCHES_KEY, 1, searchTerm.toLowerCase());
@@ -55,6 +58,9 @@ class SearchAnalyticsService {
   async getPopularSearches(limit: number = 10): Promise<Array<{ term: string; count: number }>> {
     try {
       const redis = getRedisClient();
+      if (!redis) {
+        return [];
+      }
       
       // Get top searches with scores (descending order)
       const results = await redis.zrevrange(
@@ -90,6 +96,9 @@ class SearchAnalyticsService {
   ): Promise<Array<{ term: string; resultCount: number; timestamp: number }>> {
     try {
       const redis = getRedisClient();
+      if (!redis) {
+        return [];
+      }
       const userKey = `${this.USER_SEARCH_PREFIX}${userId}`;
       
       // Get recent searches (descending by timestamp)
@@ -118,6 +127,9 @@ class SearchAnalyticsService {
   async clearUserSearchHistory(userId: string): Promise<void> {
     try {
       const redis = getRedisClient();
+      if (!redis) {
+        return;
+      }
       const userKey = `${this.USER_SEARCH_PREFIX}${userId}`;
       await redis.del(userKey);
       
@@ -141,6 +153,13 @@ class SearchAnalyticsService {
   }> {
     try {
       const redis = getRedisClient();
+      if (!redis) {
+        return {
+          totalSearches: 0,
+          uniqueSearchTerms: 0,
+          topSearches: [],
+        };
+      }
       
       const totalSearches = await redis.get('search:total_count');
       const uniqueSearchTerms = await redis.zcard(this.POPULAR_SEARCHES_KEY);

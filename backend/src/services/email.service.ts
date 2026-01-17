@@ -316,8 +316,8 @@ class EmailService {
         data: {
           status: status as any,
           sentAt: status === 'SENT' ? new Date() : undefined,
-          error,
-          attempts: {
+          errorMessage: error,
+          retryCount: {
             increment: 1,
           },
         },

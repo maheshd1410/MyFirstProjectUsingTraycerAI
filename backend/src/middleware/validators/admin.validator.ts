@@ -41,7 +41,7 @@ export const adminValidator = {
       .withMessage('startDate must be a valid ISO 8601 date (YYYY-MM-DD)')
       .custom((value, { req }) => {
         const start = new Date(value);
-        const end = req.query.endDate ? new Date(req.query.endDate as string) : new Date();
+        const end = req.query?.endDate ? new Date(req.query.endDate as string) : new Date();
         if (start > end) {
           throw new Error('startDate must be before endDate');
         }
@@ -60,7 +60,7 @@ export const adminValidator = {
         return true;
       })
       .custom((value, { req }) => {
-        if (req.query.startDate) {
+        if (req.query?.startDate) {
           const start = new Date(req.query.startDate as string);
           const end = new Date(value);
           const diffDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));

@@ -5,7 +5,7 @@ import cloudinary from '../config/cloudinary';
 import { Readable } from 'stream';
 import { searchService } from '../services/search.service';
 import { productViewService } from '../services/product-view.service';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 
 export const getAllProducts = async (req: Request, res: Response) => {
   try {
@@ -35,7 +35,7 @@ export const getProductById = async (req: Request, res: Response) => {
     const product = await productService.getProductById(id);
     
     // Track product view asynchronously (fire and forget)
-    const sessionId = (req as any).session?.id || uuidv4();
+    const sessionId = (req as any).session?.id || randomUUID();
     productViewService.trackView({
       productId: id,
       userId: (req as any).user?.id,

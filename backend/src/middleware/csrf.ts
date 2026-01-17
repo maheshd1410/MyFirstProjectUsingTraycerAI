@@ -10,7 +10,6 @@ import { Request, Response, NextFunction } from 'express';
 
 const {
   invalidCsrfTokenError,
-  generateToken: csrfGenerateToken,
   validateRequest,
   doubleCsrfProtection,
 } = doubleCsrf({
@@ -24,6 +23,7 @@ const {
   },
   size: 64,
   ignoredMethods: ['GET', 'HEAD', 'OPTIONS'],
+  getSessionIdentifier: (req: Request) => (req as any).session?.id || req.ip || 'anonymous',
   getCsrfTokenFromRequest: (req: Request) => req.headers['x-csrf-token'] as string,
 });
 
@@ -38,12 +38,6 @@ export const csrfProtection = (req: Request, res: Response, next: NextFunction) 
     }
     next();
   });
-};
-
-// Generate CSRF token for client
-export const generateCsrfToken = (req: Request, res: Response) => {
-  const token = csrfGenerateToken(req, res);
-  res.json({ csrfToken: token });
 };
 
 // Check if error is CSRF-related

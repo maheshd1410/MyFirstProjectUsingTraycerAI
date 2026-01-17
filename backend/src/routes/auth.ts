@@ -2,7 +2,7 @@ import { Router } from 'express';
 import * as authController from '../controllers/auth.controller';
 import { authenticate } from '../middleware/auth';
 import { validateRegister, validateLogin, validate } from '../middleware/validators/auth.validator';
-import { generateCsrfToken, csrfProtection } from '../middleware/csrf';
+import { csrfProtection } from '../middleware/csrf';
 
 const router = Router();
 
@@ -24,7 +24,9 @@ const router = Router();
  *                 csrfToken:
  *                   type: string
  */
-router.get('/csrf-token', generateCsrfToken);
+router.get('/csrf-token', (req, res) => {
+  res.json({ csrfToken: (req as any).csrfToken });
+});
 
 /**
  * @swagger

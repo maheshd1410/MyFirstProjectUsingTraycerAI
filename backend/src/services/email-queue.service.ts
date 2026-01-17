@@ -162,8 +162,8 @@ emailQueue.on('failed', async (job, error) => {
       where: { id: job.data.emailLogId },
       data: {
         status: 'FAILED',
-        error: `Failed after ${job.attemptsMade} attempts: ${error.message}`,
-        attempts: job.attemptsMade,
+        errorMessage: `Failed after ${job.attemptsMade} attempts: ${error.message}`,
+        retryCount: job.attemptsMade,
       },
     });
   }

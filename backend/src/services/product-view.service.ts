@@ -3,7 +3,7 @@
  */
 
 import { PrismaClient } from '@prisma/client';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import logger from '../config/logger';
 import { cacheService } from './cache.service';
 
@@ -23,7 +23,7 @@ export const productViewService = {
    */
   trackView: async (params: TrackViewParams): Promise<void> => {
     try {
-      const sessionId = params.sessionId || uuidv4();
+      const sessionId = params.sessionId || randomUUID();
 
       await prisma.productView.create({
         data: {

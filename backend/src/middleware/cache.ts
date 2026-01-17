@@ -6,7 +6,7 @@ import crypto from 'crypto';
 interface CacheMiddlewareOptions {
   ttl: number;
   keyGenerator?: (req: Request) => string;
-  tags?: string[];
+  tags?: string[] | ((req: Request) => string[]);
 }
 
 /**
@@ -69,7 +69,8 @@ export const cacheMiddleware = (options: CacheMiddlewareOptions) => {
       res.json = function(body: any) {
         // Only cache successful responses
         if (res.statusCode >= 200 && res.statusCode < 300) {
-          cacheService.set(cacheKey, body, { ttl: options.ttl, tags: options.tags })
+          const tags = typeof options.tags === 'function' ? options.tags(req) : options.tags;
+          cacheService.set(cacheKey, body, { ttl: options.ttl, tags })
             .catch(error => {
               logger.error('Failed to cache response', { cacheKey, error });
             });
@@ -125,10 +126,10 @@ export const cacheProductList = (ttl: number) => {
 export const cacheProductDetail = (ttl: number) => {
   return cacheMiddleware({
     ttl,
-    keyGenerator: (req) => {
+    keyGenerator: (req: Request) => {
       return `product:${req.params.id}`;
     },
-    tags: (req) => ['product', `product:${req.params.id}`],
+    tags: (req: Request) => ['product', `product:${req.params.id}`],
   });
 };
 

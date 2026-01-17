@@ -65,8 +65,9 @@ class CacheService {
 
         // Set TTL on tag sets if TTL is specified
         if (options.ttl) {
+          const ttl = options.ttl;
           const ttlPromises = options.tags.map(tag =>
-            redis.expire(this.buildKey(`tag:${tag}`), options.ttl + 60)
+            redis.expire(this.buildKey(`tag:${tag}`), ttl + 60)
           );
           await Promise.all(ttlPromises);
         }
@@ -239,3 +240,5 @@ class CacheService {
 
 // Export singleton instance
 export const cacheService = new CacheService();
+
+

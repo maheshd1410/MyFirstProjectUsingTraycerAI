@@ -1,6 +1,5 @@
 import { Router } from 'express';
-import { authenticate } from '../middleware/auth';
-import { requireRole } from '../middleware/authorizationMiddleware';
+import { authenticate, requireRole } from '../middleware/auth';
 import { adminController } from '../controllers/admin.controller';
 import { csrfProtection } from '../middleware/csrf';
 import { adminValidator } from '../middleware/validators/admin.validator';
