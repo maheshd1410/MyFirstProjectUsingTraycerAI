@@ -96,7 +96,7 @@ jobs:
         run: npm run prebuild -- --platform android
       - name: Upload Android prebuild artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: mobile-android-prebuild
           path: mobile-app/android
@@ -137,7 +137,7 @@ jobs:
         run: npm run prebuild -- --platform ios
       - name: Upload iOS prebuild artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: mobile-ios-prebuild
           path: mobile-app/ios
