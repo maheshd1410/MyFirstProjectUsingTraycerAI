@@ -6,6 +6,7 @@ import { OAuthUserProfile } from '../types';
 // Configure Google OAuth Strategy
 if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   passport.use(
+    'google',
     new GoogleStrategy(
       {
         clientID: process.env.GOOGLE_CLIENT_ID,
@@ -29,7 +30,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           return done(error as Error);
         }
       }
-    )
+    ) as any
   );
 }
 
@@ -50,7 +51,7 @@ if (
         callbackURL: `${process.env.API_URL}/api/auth/apple/callback`,
         scope: ['name', 'email'],
       },
-      (accessToken, refreshToken, idToken, profile, done) => {
+      (accessToken: any, refreshToken: any, idToken: any, profile: any, done: any) => {
         try {
           // Extract user profile data
           const userProfile: OAuthUserProfile = {

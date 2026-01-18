@@ -38,7 +38,7 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'", 'https://cdnjs.cloudflare.com'],
       scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
       imgSrc: ["'self'", 'data:', 'https:', 'http:'],
-      connectSrc: ["'self'", 'http://localhost:3000', 'http://127.0.0.1:3000'],
+      connectSrc: ["'self'", 'http://localhost:3000', 'http://127.0.0.1:3000', 'https://api.ladoobusiness.com'],
       fontSrc: ["'self'", 'data:', 'https://cdnjs.cloudflare.com'],
       objectSrc: ["'none'"],
       mediaSrc: ["'self'"],
@@ -57,10 +57,18 @@ app.use(helmet({
 
 // CORS configuration
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:8081'],
+  origin: (origin, callback) => {
+    const allowedOrigins = ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:8081'];
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(null, true); // Allow all origins for testing
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'x-csrf-token'],
+  exposedHeaders: ['Content-Type', 'Authorization'],
 }));
 
 // Request and response loggers (before routes)

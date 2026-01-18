@@ -139,7 +139,9 @@ export class AuthService {
       },
     });
 
-    return user;
+    // Return user without password
+    const { password: _, ...userWithoutPassword } = user;
+    return userWithoutPassword;
   }
 
   /**

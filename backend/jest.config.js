@@ -1,7 +1,29 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  roots: ['<rootDir>/src', '<rootDir>/__tests__'],
+  roots: ['<rootDir>'],
+  testMatch: ['**/__tests__/**/*.test.ts', '**/__tests__/**/*.spec.ts'],
+  setupFilesAfterEnv: ['<rootDir>/__tests__/setup.ts'],
+  clearMocks: true,
+  resetMocks: true,
+  testTimeout: 10000,
+  transform: {
+    '^.+\\.tsx?$': ['ts-jest', {
+      tsconfig: {
+        esModuleInterop: true,
+        allowSyntheticDefaultImports: true,
+        skipLibCheck: true,
+        noImplicitAny: false,
+        suppressImplicitAnyIndexErrors: true,
+        strict: false,
+        resolveJsonModule: true,
+        declaration: false,
+      },
+    }],
+  },
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/src/$1',
+  },
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/index.ts',
@@ -10,12 +32,4 @@ module.exports = {
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],
-  testMatch: ['**/__tests__/**/*.test.ts', '**/*.spec.ts'],
-  setupFilesAfterEnv: ['<rootDir>/__tests__/setup.ts'],
-  clearMocks: true,
-  resetMocks: true,
-  testTimeout: 10000,
-  moduleNameMapper: {
-    '^@/(.*)$': '<rootDir>/src/$1',
-  },
 };

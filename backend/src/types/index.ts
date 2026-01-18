@@ -70,6 +70,7 @@ export interface UpdateProfileDTO {
 
 export interface UserResponse {
   id: string;
+  userId?: string;
   email: string;
   firstName: string;
   lastName: string;
@@ -85,11 +86,13 @@ export interface UserResponse {
 // Extended Express Request with user
 declare global {
   namespace Express {
+    interface User {
+      userId?: string;
+      id?: string;
+      role?: string;
+    }
     interface Request {
-      user?: {
-        userId: string;
-        role: UserRole;
-      };
+      user?: User;
     }
   }
 }
@@ -496,6 +499,7 @@ export interface CouponValidationResult {
   finalAmount: number;
   message?: string;
   couponId?: string;
+  isFreeShipping?: boolean;
 }
 
 export interface CouponResponse {

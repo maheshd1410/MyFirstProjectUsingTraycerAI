@@ -1,6 +1,6 @@
-import { cacheService } from '../../services/cache.service';
-import { getRedisClient } from '../../config/redis';
-import { cacheMetricsService } from '../../services/cache-metrics.service';
+import { cacheService } from '../../src/services/cache.service';
+import { getRedisClient } from '../../src/config/redis';
+import { cacheMetricsService } from '../../src/services/cache-metrics.service';
 
 /**
  * Clear all test cache data

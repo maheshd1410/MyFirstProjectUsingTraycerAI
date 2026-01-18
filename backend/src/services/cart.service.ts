@@ -100,7 +100,7 @@ export class CartService {
         cartId_productId_variantId: {
           cartId: cart.id,
           productId,
-          variantId: variantId || null,
+          variantId: variantId || undefined,
         },
       },
     });

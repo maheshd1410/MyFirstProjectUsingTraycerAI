@@ -41,10 +41,15 @@ export const requireRole = (...roles: UserRole[]) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    if (!roles.includes(req.user.role)) {
+    if (!roles.includes(req.user.role as UserRole)) {
       return res.status(403).json({ error: 'Forbidden - insufficient permissions' });
     }
 
     next();
   };
 };
+
+/**
+ * Alias for requireRole for backward compatibility
+ */
+export const authorize = requireRole;

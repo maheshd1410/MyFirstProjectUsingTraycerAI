@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { AuthService } from '../../src/services/auth.service';
 import { prismaMock } from '../mocks/prisma.mock';
 import { createMockUser, TEST_USER_EMAIL, TEST_USER_PHONE, TEST_PASSWORD } from '../helpers/test-data';

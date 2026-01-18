@@ -18,7 +18,7 @@ const options: swaggerJsdoc.Options = {
     },
     servers: [
       {
-        url: 'http://localhost:5000',
+        url: 'http://localhost:3000',
         description: 'Development server',
       },
       {
@@ -81,7 +81,7 @@ const options: swaggerJsdoc.Options = {
         },
         RegisterRequest: {
           type: 'object',
-          required: ['email', 'password', 'fullName', 'phoneNumber'],
+          required: ['email', 'password', 'firstName', 'lastName', 'phoneNumber'],
           properties: {
             email: {
               type: 'string',
@@ -93,9 +93,13 @@ const options: swaggerJsdoc.Options = {
               minLength: 6,
               example: 'password123',
             },
-            fullName: {
+            firstName: {
               type: 'string',
-              example: 'John Doe',
+              example: 'John',
+            },
+            lastName: {
+              type: 'string',
+              example: 'Doe',
             },
             phoneNumber: {
               type: 'string',

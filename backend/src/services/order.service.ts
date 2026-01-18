@@ -192,7 +192,7 @@ export class OrderService {
           variantId: item.variantId || null,
           variantSku: item.variantId ? variantSkuMap.get(item.variantId) || null : null,
           variantName: item.variantName || null,
-          variantAttributes: item.variantAttributes || null,
+          variantAttributes: item.variantAttributes ? JSON.parse(JSON.stringify(item.variantAttributes)) : undefined,
         })),
       });
 

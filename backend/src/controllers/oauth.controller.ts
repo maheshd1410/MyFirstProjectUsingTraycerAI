@@ -26,20 +26,21 @@ export const oauthController = {
           return res.redirect(redirectUrl);
         }
 
-        // Find or create user
         const { user, isNewUser } = await authService.findOrCreateOAuthUser(profile, 'google');
 
         // Generate JWT tokens
+        const jwtSecret = process.env.JWT_SECRET || 'default-secret';
+        const jwtRefreshSecret = process.env.JWT_REFRESH_SECRET || 'default-refresh-secret';
         const accessToken = jwt.sign(
           { userId: user.id, role: user.role },
-          process.env.JWT_SECRET!,
-          { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+          jwtSecret,
+          { expiresIn: process.env.JWT_EXPIRES_IN || '7d' } as jwt.SignOptions
         );
 
         const refreshToken = jwt.sign(
           { userId: user.id },
-          process.env.JWT_REFRESH_SECRET!,
-          { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d' }
+          jwtRefreshSecret,
+          { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d' } as jwt.SignOptions
         );
 
         // Store refresh token in database
@@ -85,16 +86,18 @@ export const oauthController = {
         const { user, isNewUser } = await authService.findOrCreateOAuthUser(profile, 'apple');
 
         // Generate JWT tokens
+        const jwtSecret = process.env.JWT_SECRET || 'default-secret';
+        const jwtRefreshSecret = process.env.JWT_REFRESH_SECRET || 'default-refresh-secret';
         const accessToken = jwt.sign(
           { userId: user.id, role: user.role },
-          process.env.JWT_SECRET!,
-          { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+          jwtSecret,
+          { expiresIn: process.env.JWT_EXPIRES_IN || '7d' } as jwt.SignOptions
         );
 
         const refreshToken = jwt.sign(
           { userId: user.id },
-          process.env.JWT_REFRESH_SECRET!,
-          { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d' }
+          jwtRefreshSecret,
+          { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d' } as jwt.SignOptions
         );
 
         // Store refresh token in database
