@@ -6,7 +6,13 @@ const initialState: ProductState = {
   products: [],
   selectedProduct: null,
   categories: [],
-  loading: false,
+  loading: {
+    fetch: false,
+    refresh: false,
+    loadMore: false,
+    action: false,
+    upload: false,
+  },
   error: null,
   filters: {
     page: 1,
@@ -113,12 +119,17 @@ const productSlice = createSlice({
   extraReducers: (builder) => {
     // Fetch Products
     builder
-      .addCase(fetchProducts.pending, (state) => {
-        state.loading = true;
+      .addCase(fetchProducts.pending, (state, action) => {
+        if (action.meta.arg.page === 1) {
+          state.loading.fetch = true;
+        } else {
+          state.loading.loadMore = true;
+        }
         state.error = null;
       })
       .addCase(fetchProducts.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loading.fetch = false;
+        state.loading.loadMore = false;
         state.products = action.payload.products;
         state.pagination = {
           currentPage: action.payload.page,
@@ -127,48 +138,49 @@ const productSlice = createSlice({
         };
       })
       .addCase(fetchProducts.rejected, (state, action) => {
-        state.loading = false;
+        state.loading.fetch = false;
+        state.loading.loadMore = false;
         state.error = action.payload as string;
       });
 
     // Fetch Product By ID
     builder
       .addCase(fetchProductById.pending, (state) => {
-        state.loading = true;
+        state.loading.fetch = true;
         state.error = null;
       })
       .addCase(fetchProductById.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loading.fetch = false;
         state.selectedProduct = action.payload;
       })
       .addCase(fetchProductById.rejected, (state, action) => {
-        state.loading = false;
+        state.loading.fetch = false;
         state.error = action.payload as string;
       });
 
     // Fetch Featured Products
     builder
       .addCase(fetchFeaturedProducts.pending, (state) => {
-        state.loading = true;
+        state.loading.fetch = true;
         state.error = null;
       })
       .addCase(fetchFeaturedProducts.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loading.fetch = false;
         state.products = action.payload;
       })
       .addCase(fetchFeaturedProducts.rejected, (state, action) => {
-        state.loading = false;
+        state.loading.fetch = false;
         state.error = action.payload as string;
       });
 
     // Fetch Products By Category
     builder
       .addCase(fetchProductsByCategory.pending, (state) => {
-        state.loading = true;
+        state.loading.fetch = true;
         state.error = null;
       })
       .addCase(fetchProductsByCategory.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loading.fetch = false;
         state.products = action.payload.products;
         state.pagination = {
           currentPage: action.payload.page,
@@ -177,22 +189,22 @@ const productSlice = createSlice({
         };
       })
       .addCase(fetchProductsByCategory.rejected, (state, action) => {
-        state.loading = false;
+        state.loading.fetch = false;
         state.error = action.payload as string;
       });
 
     // Fetch Categories
     builder
       .addCase(fetchCategories.pending, (state) => {
-        state.loading = true;
+        state.loading.fetch = true;
         state.error = null;
       })
       .addCase(fetchCategories.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loading.fetch = false;
         state.categories = action.payload;
       })
       .addCase(fetchCategories.rejected, (state, action) => {
-        state.loading = false;
+        state.loading.fetch = false;
         state.error = action.payload as string;
       });
   },
@@ -203,5 +215,8 @@ export const { setFilters, clearFilters, clearSelectedProduct, clearError } =
 
 // Selectors
 export const selectCategories = (state: any) => state.product.categories;
+export const selectProductLoadingState = (state: any) => state.product.loading;
+export const selectIsProductsLoading = (state: any) => 
+  state.product.loading.fetch || state.product.loading.refresh;
 
 export default productSlice.reducer;

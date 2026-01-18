@@ -1,7 +1,7 @@
 import bcrypt from 'bcrypt';
-import { UserRole } from '@prisma/client';
+import { UserRole, AuthProvider } from '@prisma/client';
 import { prisma } from '../config/database';
-import { RegisterDTO } from '../types';
+import { RegisterDTO, OAuthUserProfile, OAuthProvider } from '../types';
 import { emailService } from './email.service';
 import logger from '../config/logger';
 
@@ -57,7 +57,7 @@ export class AuthService {
   }
 
   /**
-   * Login user and verify password with account lockout protection
+   * Login user with email/password; rejects OAuth-only accounts and enforces lockout protection.
    */
   async login(email: string, password: string) {
     // Find user by email
@@ -67,6 +67,12 @@ export class AuthService {
 
     if (!user) {
       throw new Error('User not found');
+    }
+
+    // OAuth-only accounts cannot use email/password login
+    // This prevents bcrypt.compare on empty hashes and provides a clear UX message.
+    if (!user.isEmailPasswordSet) {
+      throw new Error('This account uses OAuth authentication only. Please sign in using Google or Apple');
     }
 
     // Check if account is locked
@@ -237,5 +243,180 @@ export class AuthService {
     // Return user without sensitive fields
     const { password, refreshToken, fcmToken, ...userWithoutSensitiveFields } = user;
     return userWithoutSensitiveFields;
+  }
+
+  /**
+   * Find or create OAuth user
+   */
+  async findOrCreateOAuthUser(profile: OAuthUserProfile, provider: OAuthProvider) {
+    const providerId = provider === 'google' ? 'googleId' : 'appleId';
+    const authProvider = provider === 'google' ? AuthProvider.GOOGLE : AuthProvider.APPLE;
+    let isNewUser = false;
+
+    // Check if user exists by provider ID
+    const existingUserByProviderId = await prisma.user.findFirst({
+      where: {
+        [providerId]: profile.id,
+      },
+    });
+
+    if (existingUserByProviderId) {
+      return { user: existingUserByProviderId, isNewUser: false };
+    }
+
+    // Check if user exists by email
+    const existingUserByEmail = await prisma.user.findUnique({
+      where: { email: profile.email },
+    });
+
+    if (existingUserByEmail) {
+      // If user has password set, they must login and link account manually
+      if (existingUserByEmail.isEmailPasswordSet) {
+        throw new Error('Email already registered. Please login and link account from settings');
+      }
+
+      // Link OAuth provider to existing account
+      const updatedUser = await prisma.user.update({
+        where: { id: existingUserByEmail.id },
+        data: {
+          [providerId]: profile.id,
+          authProvider,
+          emailVerified: true,
+          ...(profile.profileImage && !existingUserByEmail.profileImage && { profileImage: profile.profileImage }),
+        },
+      });
+
+      return { user: updatedUser, isNewUser: false };
+    }
+
+    // Create new user with OAuth provider
+    isNewUser = true;
+    const newUser = await prisma.user.create({
+      data: {
+        email: profile.email,
+        password: await bcrypt.hash('oauth-placeholder', 10),
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        phoneNumber: `+${Date.now()}`, // Temporary phone number, will be updated later
+        role: UserRole.CUSTOMER,
+        authProvider,
+        [providerId]: profile.id,
+        emailVerified: true,
+        isEmailPasswordSet: false,
+        profileImage: profile.profileImage,
+      },
+    });
+
+    // Send welcome email
+    try {
+      await emailService.sendWelcomeEmail({ email: newUser.email, fullName: `${newUser.firstName} ${newUser.lastName}` });
+      logger.info('Welcome email queued for OAuth user', { userId: newUser.id });
+    } catch (error) {
+      logger.error('Failed to queue welcome email for OAuth user', { userId: newUser.id, error });
+    }
+
+    return { user: newUser, isNewUser };
+  }
+
+  /**
+   * Link OAuth provider to existing user account
+   */
+  async linkOAuthProvider(userId: string, profile: OAuthUserProfile, provider: OAuthProvider) {
+    const providerId = provider === 'google' ? 'googleId' : 'appleId';
+
+    // Verify user exists
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    // Check if provider already linked to this user
+    if (user[providerId as keyof typeof user]) {
+      throw new Error(`${provider.charAt(0).toUpperCase() + provider.slice(1)} account already linked`);
+    }
+
+    // Check if provider ID is linked to another user
+    const existingUserWithProvider = await prisma.user.findFirst({
+      where: {
+        [providerId]: profile.id,
+        id: { not: userId },
+      },
+    });
+
+    if (existingUserWithProvider) {
+      throw new Error(`This ${provider} account is already linked to another user`);
+    }
+
+    // Link provider to user
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        [providerId]: profile.id,
+        emailVerified: true,
+      },
+    });
+
+    const { password, refreshToken, fcmToken, ...userWithoutSensitiveFields } = updatedUser;
+    return userWithoutSensitiveFields;
+  }
+
+  /**
+   * Unlink OAuth provider from user account
+   */
+  async unlinkOAuthProvider(userId: string, provider: OAuthProvider) {
+    const providerId = provider === 'google' ? 'googleId' : 'appleId';
+
+    // Verify user exists
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    // Check if provider is linked
+    if (!user[providerId as keyof typeof user]) {
+      throw new Error(`${provider.charAt(0).toUpperCase() + provider.slice(1)} account is not linked`);
+    }
+
+    // Ensure user has at least one authentication method
+    const hasPassword = user.isEmailPasswordSet;
+    const hasGoogle = user.googleId !== null;
+    const hasApple = user.appleId !== null;
+    const authMethodsCount = [hasPassword, hasGoogle, hasApple].filter(Boolean).length;
+
+    if (authMethodsCount <= 1) {
+      throw new Error('Cannot unlink. You must have at least one authentication method');
+    }
+
+    // Unlink provider
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        [providerId]: null,
+      },
+    });
+
+    const { password, refreshToken, fcmToken, ...userWithoutSensitiveFields } = updatedUser;
+    return userWithoutSensitiveFields;
+  }
+
+  /**
+   * Get user by provider ID
+   */
+  async getUserByProviderId(providerId: string, provider: OAuthProvider) {
+    const field = provider === 'google' ? 'googleId' : 'appleId';
+
+    const user = await prisma.user.findFirst({
+      where: {
+        [field]: providerId,
+      },
+    });
+
+    return user;
   }
 }

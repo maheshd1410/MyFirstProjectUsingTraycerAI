@@ -9,13 +9,16 @@ import {
   TextInput,
   TouchableOpacity,
   SafeAreaView,
+  Alert,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useProducts } from '../../hooks';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { ProductCard, FilterModal } from '../../components';
+import { ProductCard, FilterModal, OfflineBanner, ProductCardSkeleton } from '../../components';
 import { FilterValues } from '../../components/FilterModal';
 import { theme } from '../../theme';
+import { useNetworkStatus } from '../../utils/network';
+import { formatErrorForDisplay } from '../../utils/errorMessages';
 import {
   addToWishlistAsync,
   removeFromWishlistAsync,
@@ -32,6 +35,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'ProductList'>;
 
 export const ProductListScreen: React.FC<Props> = ({ navigation }) => {
   const dispatch = useAppDispatch();
+  const { isConnected } = useNetworkStatus();
   const {
     products,
     categories,
@@ -62,6 +66,10 @@ export const ProductListScreen: React.FC<Props> = ({ navigation }) => {
   }, []);
 
   const handleRefresh = async () => {
+    if (!isConnected) {
+      Alert.alert('Offline', 'Cannot refresh while offline. Showing cached data.');
+      return;
+    }
     setRefreshing(true);
     resetFilters();
     await loadProducts();
@@ -94,6 +102,9 @@ export const ProductListScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const handleWishlistToggle = (productId: string) => {
+    if (!isConnected) {
+      Alert.alert('Offline', 'Added to wishlist (will sync when online)');
+    }
     if (isProductInWishlist(productId)) {
       dispatch(removeFromWishlistAsync(productId));
     } else {
@@ -102,7 +113,7 @@ export const ProductListScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const handleLoadMore = () => {
-    if (!loading && pagination.currentPage < pagination.totalPages) {
+    if (!loading.loadMore && !loading.fetch && pagination.currentPage < pagination.totalPages) {
       const nextPage = pagination.currentPage + 1;
       loadProducts({ ...filters, page: nextPage });
     }
@@ -122,18 +133,24 @@ export const ProductListScreen: React.FC<Props> = ({ navigation }) => {
     loadProducts({ ...filters, sortBy, page: 1 });
   };
 
-  if (error && !loading && products.length === 0) {
+  if (error && !loading.fetch && products.length === 0) {
     return (
       <SafeAreaView style={styles.container}>
+        <OfflineBanner />
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Failed to load products</Text>
-          <Text style={styles.errorMessage}>{error}</Text>
+          <Text style={styles.errorMessage}>{formatErrorForDisplay(error)}</Text>
           <TouchableOpacity
-            style={styles.retryButton}
+            style={[styles.retryButton, !isConnected && styles.buttonDisabled]}
             onPress={() => {
+              if (!isConnected) {
+                Alert.alert('Offline', 'Cannot retry while offline');
+                return;
+              }
               clearError();
               loadProducts();
             }}
+            disabled={!isConnected}
           >
             <Text style={styles.retryText}>Retry</Text>
           </TouchableOpacity>
@@ -144,6 +161,14 @@ export const ProductListScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <OfflineBanner />
+      {!isConnected && products.length > 0 && (
+        <View style={styles.cacheNotice}>
+          <Text style={styles.cacheNoticeText}>
+            📦 Viewing cached data (offline mode)
+          </Text>
+        </View>
+      )}
       {/* Search Bar with Filter Button */}
       <View style={styles.searchContainer}>
         <TextInput
@@ -298,11 +323,15 @@ export const ProductListScreen: React.FC<Props> = ({ navigation }) => {
       </View>
 
       {/* Products Grid */}
-      {loading && products.length === 0 ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={styles.loadingText}>Loading products...</Text>
-        </View>
+      {loading.fetch && products.length === 0 ? (
+        <FlatList
+          data={Array.from({ length: 10 })}
+          numColumns={2}
+          columnWrapperStyle={styles.columnWrapper}
+          renderItem={() => <ProductCardSkeleton variant="grid" />}
+          keyExtractor={(_, index) => `skeleton-${index}`}
+          contentContainerStyle={styles.gridContent}
+        />
       ) : products.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>No products found</Text>
@@ -333,7 +362,7 @@ export const ProductListScreen: React.FC<Props> = ({ navigation }) => {
             />
           }
           ListFooterComponent={
-            loading ? (
+            loading.loadMore ? (
               <View style={styles.footerLoader}>
                 <ActivityIndicator size="small" color={theme.colors.primary} />
               </View>
@@ -519,5 +548,20 @@ const styles = StyleSheet.create({
     color: theme.colors.background,
     fontSize: theme.typography.fontSizes.base,
     fontWeight: theme.typography.fontWeights.semibold as '600',
+  },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
+  cacheNotice: {
+    backgroundColor: theme.colors.info + '20',
+    padding: theme.spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.info,
+  },
+  cacheNoticeText: {
+    color: theme.colors.info,
+    fontSize: theme.typography.fontSizes.sm,
+    textAlign: 'center',
+    fontWeight: theme.typography.fontWeights.medium as '500',
   },
 });

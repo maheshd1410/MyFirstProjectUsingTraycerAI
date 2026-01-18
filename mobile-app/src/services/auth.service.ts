@@ -1,5 +1,6 @@
 import api from './api';
 import { LoginCredentials, RegisterData, AuthResponse, User } from '../types';
+import { oauthService } from './oauth.service';
 
 /**
  * Register a new user
@@ -15,6 +16,28 @@ export const register = async (data: RegisterData): Promise<AuthResponse> => {
 export const login = async (credentials: LoginCredentials): Promise<AuthResponse> => {
   const response = await api.post('/auth/login', credentials);
   return response.data;
+};
+
+/**
+ * Login with OAuth (Google or Apple)
+ */
+export const loginWithOAuth = async (provider: 'google' | 'apple', callbackUrl: string): Promise<AuthResponse> => {
+  // Parse tokens from callback URL
+  const { token, refreshToken, isNewUser } = oauthService.exchangeCodeForTokens(callbackUrl);
+
+  // Fetch user data
+  const userResponse = await api.get('/auth/me', {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return {
+    user: userResponse.data,
+    accessToken: token,
+    refreshToken,
+    isNewUser,
+  };
 };
 
 /**

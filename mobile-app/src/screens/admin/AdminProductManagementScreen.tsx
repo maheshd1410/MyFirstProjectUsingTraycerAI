@@ -129,7 +129,7 @@ export const AdminProductManagementScreen: React.FC<AdminProductManagementScreen
         ) : null}
       </View>
 
-      {loading && !filteredProducts.length ? (
+      {loading.fetch && !filteredProducts.length ? (
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
         </View>

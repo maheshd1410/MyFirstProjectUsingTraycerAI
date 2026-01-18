@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import { authenticate, requireRole } from '../middleware/auth';
 import { adminController } from '../controllers/admin.controller';
+import { couponController } from '../controllers/coupon.controller';
 import { csrfProtection } from '../middleware/csrf';
 import { adminValidator } from '../middleware/validators/admin.validator';
+import { couponValidator } from '../middleware/validators/coupon.validator';
 
 const router = Router();
 
@@ -815,6 +817,197 @@ router.post(
   '/analytics/refresh-views',
   csrfProtection,
   adminController.refreshAnalyticsViews
+);
+
+/**
+ * @swagger
+ * /api/admin/coupons:
+ *   post:
+ *     summary: Create a new coupon (Admin only)
+ *     tags: [Admin - Coupons]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - code
+ *               - name
+ *               - discountType
+ *               - discountValue
+ *               - validFrom
+ *               - validUntil
+ *             properties:
+ *               code:
+ *                 type: string
+ *                 example: "SAVE20"
+ *               name:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               discountType:
+ *                 type: string
+ *                 enum: [PERCENTAGE, FIXED_AMOUNT, FREE_SHIPPING]
+ *               discountValue:
+ *                 type: number
+ *               minOrderAmount:
+ *                 type: number
+ *               maxDiscountAmount:
+ *                 type: number
+ *               usageLimit:
+ *                 type: integer
+ *               perUserLimit:
+ *                 type: integer
+ *               validFrom:
+ *                 type: string
+ *                 format: date-time
+ *               validUntil:
+ *                 type: string
+ *                 format: date-time
+ *     responses:
+ *       201:
+ *         description: Coupon created successfully
+ *       400:
+ *         description: Validation error
+ */
+router.post(
+  '/coupons',
+  csrfProtection,
+  couponValidator.validateCreateCoupon,
+  couponController.createCoupon
+);
+
+/**
+ * @swagger
+ * /api/admin/coupons:
+ *   get:
+ *     summary: Get all coupons with filters (Admin only)
+ *     tags: [Admin - Coupons]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: pageSize
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [ACTIVE, INACTIVE, EXPIRED]
+ *       - in: query
+ *         name: discountType
+ *         schema:
+ *           type: string
+ *           enum: [PERCENTAGE, FIXED_AMOUNT, FREE_SHIPPING]
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ */
+router.get(
+  '/coupons',
+  couponValidator.validateGetCoupons,
+  couponController.getAllCoupons
+);
+
+/**
+ * @swagger
+ * /api/admin/coupons/{id}:
+ *   get:
+ *     summary: Get coupon by ID (Admin only)
+ *     tags: [Admin - Coupons]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ */
+router.get(
+  '/coupons/:id',
+  couponValidator.validateCouponId,
+  couponController.getCouponById
+);
+
+/**
+ * @swagger
+ * /api/admin/coupons/{id}:
+ *   put:
+ *     summary: Update coupon (Admin only)
+ *     tags: [Admin - Coupons]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ */
+router.put(
+  '/coupons/:id',
+  csrfProtection,
+  couponValidator.validateUpdateCoupon,
+  couponController.updateCoupon
+);
+
+/**
+ * @swagger
+ * /api/admin/coupons/{id}:
+ *   delete:
+ *     summary: Delete coupon (Admin only)
+ *     tags: [Admin - Coupons]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ */
+router.delete(
+  '/coupons/:id',
+  csrfProtection,
+  couponValidator.validateCouponId,
+  couponController.deleteCoupon
+);
+
+/**
+ * @swagger
+ * /api/admin/coupons/{id}/stats:
+ *   get:
+ *     summary: Get coupon usage statistics (Admin only)
+ *     tags: [Admin - Coupons]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ */
+router.get(
+  '/coupons/:id/stats',
+  couponValidator.validateCouponId,
+  couponController.getCouponUsageStats
 );
 
 export default router;

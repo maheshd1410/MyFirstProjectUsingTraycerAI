@@ -23,6 +23,29 @@ export interface RefreshTokenDTO {
   refreshToken: string;
 }
 
+// OAuth Types
+export type OAuthProvider = 'google' | 'apple';
+
+export interface OAuthCallbackDTO {
+  provider: OAuthProvider;
+  code: string;
+  state?: string;
+  redirectUri: string;
+}
+
+export interface OAuthUserProfile {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  profileImage?: string;
+}
+
+export interface LinkOAuthAccountDTO {
+  provider: OAuthProvider;
+  accessToken: string;
+}
+
 // Authentication Response
 export interface AuthResponse {
   user: {
@@ -35,6 +58,7 @@ export interface AuthResponse {
   };
   accessToken: string;
   refreshToken: string;
+  isNewUser?: boolean;
 }
 
 // Profile DTOs
@@ -187,6 +211,48 @@ export interface ProductResponse {
   isFeatured: boolean;
   averageRating: number;
   totalReviews: number;
+  variants?: ProductVariantResponse[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Product Variant DTOs
+export interface CreateProductVariantDTO {
+  productId: string;
+  sku: string;
+  name: string;
+  attributes: Record<string, string>;  // { size: "L", color: "Red" }
+  price?: number;
+  discountPrice?: number;
+  stockQuantity: number;
+  lowStockThreshold?: number;
+  sortOrder?: number;
+}
+
+export interface UpdateProductVariantDTO {
+  sku?: string;
+  name?: string;
+  attributes?: Record<string, string>;
+  price?: number;
+  discountPrice?: number;
+  stockQuantity?: number;
+  lowStockThreshold?: number;
+  isActive?: boolean;
+  sortOrder?: number;
+}
+
+export interface ProductVariantResponse {
+  id: string;
+  productId: string;
+  sku: string;
+  name: string;
+  attributes: Record<string, string>;
+  price?: string;
+  discountPrice?: string;
+  stockQuantity: number;
+  lowStockThreshold: number;
+  isActive: boolean;
+  sortOrder: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -218,6 +284,7 @@ export interface CategoryResponse {
 export interface CartItemDTO {
   productId: string;
   quantity: number;
+  variantId?: string;
 }
 
 export interface CartItemResponse {
@@ -229,6 +296,9 @@ export interface CartItemResponse {
   discountPrice?: string;
   quantity: number;
   subtotal: string;
+  variantId?: string;
+  variantName?: string;
+  variantAttributes?: Record<string, string>;
   createdAt: Date;
 }
 
@@ -260,6 +330,7 @@ export interface CreateOrderDTO {
   addressId: string;
   paymentMethod: 'CARD' | 'UPI' | 'COD' | 'WALLET';
   specialInstructions?: string;
+  couponCode?: string;
 }
 
 export interface UpdateOrderStatusDTO {
@@ -278,6 +349,10 @@ export interface OrderItemResponse {
   quantity: number;
   unitPrice: string;
   totalPrice: string;
+  variantId?: string;
+  variantSku?: string;
+  variantName?: string;
+  variantAttributes?: Record<string, string>;
 }
 
 export interface OrderResponse {
@@ -291,6 +366,9 @@ export interface OrderResponse {
   taxAmount: string;
   deliveryCharge: string;
   discountAmount: string;
+  couponDiscount: string;
+  couponCode: string | null;
+  couponId: string | null;
   totalAmount: string;
   specialInstructions: string | null;
   estimatedDeliveryDate: Date | null;
@@ -381,4 +459,70 @@ export interface ReviewResponse {
   helpfulCount: number;
   createdAt: Date;
   updatedAt: Date;
+}
+// Coupon DTOs
+export interface CreateCouponDTO {
+  code: string;
+  name: string;
+  description?: string;
+  discountType: 'PERCENTAGE' | 'FIXED_AMOUNT' | 'FREE_SHIPPING';
+  discountValue: number;
+  minOrderAmount?: number;
+  maxDiscountAmount?: number;
+  usageLimit?: number;
+  perUserLimit?: number;
+  validFrom: Date;
+  validUntil: Date;
+  applicableCategories?: string[];
+  applicableProducts?: string[];
+  restrictedUserIds?: string[];
+}
+
+export interface UpdateCouponDTO extends Partial<CreateCouponDTO> {
+  isActive?: boolean;
+}
+
+export interface CouponFilterDTO {
+  page?: number;
+  pageSize?: number;
+  status?: 'ACTIVE' | 'INACTIVE' | 'EXPIRED';
+  discountType?: 'PERCENTAGE' | 'FIXED_AMOUNT' | 'FREE_SHIPPING';
+  search?: string;
+}
+
+export interface CouponValidationResult {
+  isValid: boolean;
+  discountAmount: number;
+  finalAmount: number;
+  message?: string;
+  couponId?: string;
+}
+
+export interface CouponResponse {
+  id: string;
+  code: string;
+  name: string;
+  description?: string;
+  discountType: string;
+  discountValue: number;
+  minOrderAmount?: number;
+  maxDiscountAmount?: number;
+  usageLimit?: number;
+  usageCount: number;
+  perUserLimit?: number;
+  validFrom: Date;
+  validUntil: Date;
+  isActive: boolean;
+  status: string;
+  applicableCategories: string[];
+  applicableProducts: string[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ApplyCouponDTO {
+  code: string;
+  orderAmount: number;
+  categoryIds: string[];
+  productIds: string[];
 }

@@ -6,7 +6,13 @@ import { RootState } from '../index';
 const initialState: ReviewState = {
   reviews: [],
   userReviews: [],
-  loading: false,
+  loading: {
+    fetch: false,
+    refresh: false,
+    loadMore: false,
+    action: false,
+    upload: false,
+  },
   error: null,
   pagination: {
     currentPage: 1,
@@ -98,29 +104,29 @@ const reviewSlice = createSlice({
     // Create Review
     builder
       .addCase(createReview.pending, (state) => {
-        state.loading = true;
+        state.loading.action = true;
         state.error = null;
       })
       .addCase(createReview.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loading.action = false;
         // Add created review to reviews list so it appears immediately on product detail
         state.reviews.unshift(action.payload);
         // Also add to user reviews
         state.userReviews.push(action.payload);
       })
       .addCase(createReview.rejected, (state, action) => {
-        state.loading = false;
+        state.loading.action = false;
         state.error = action.payload as string;
       });
 
     // Update Review
     builder
       .addCase(updateReview.pending, (state) => {
-        state.loading = true;
+        state.loading.action = true;
         state.error = null;
       })
       .addCase(updateReview.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loading.action = false;
         const index = state.reviews.findIndex((r) => r.id === action.payload.id);
         if (index !== -1) {
           state.reviews[index] = action.payload;
@@ -131,54 +137,54 @@ const reviewSlice = createSlice({
         }
       })
       .addCase(updateReview.rejected, (state, action) => {
-        state.loading = false;
+        state.loading.action = false;
         state.error = action.payload as string;
       });
 
     // Delete Review
     builder
       .addCase(deleteReview.pending, (state) => {
-        state.loading = true;
+        state.loading.action = true;
         state.error = null;
       })
       .addCase(deleteReview.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loading.action = false;
         state.reviews = state.reviews.filter((r) => r.id !== action.payload);
         state.userReviews = state.userReviews.filter((r) => r.id !== action.payload);
       })
       .addCase(deleteReview.rejected, (state, action) => {
-        state.loading = false;
+        state.loading.action = false;
         state.error = action.payload as string;
       });
 
     // Fetch Product Reviews
     builder
       .addCase(fetchProductReviews.pending, (state) => {
-        state.loading = true;
+        state.loading.fetch = true;
         state.error = null;
       })
       .addCase(fetchProductReviews.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loading.fetch = false;
         state.reviews = action.payload.reviews;
         state.pagination = action.payload.pagination;
       })
       .addCase(fetchProductReviews.rejected, (state, action) => {
-        state.loading = false;
+        state.loading.fetch = false;
         state.error = action.payload as string;
       });
 
     // Fetch User Reviews
     builder
       .addCase(fetchUserReviews.pending, (state) => {
-        state.loading = true;
+        state.loading.fetch = true;
         state.error = null;
       })
       .addCase(fetchUserReviews.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loading.fetch = false;
         state.userReviews = action.payload;
       })
       .addCase(fetchUserReviews.rejected, (state, action) => {
-        state.loading = false;
+        state.loading.fetch = false;
         state.error = action.payload as string;
       });
   },

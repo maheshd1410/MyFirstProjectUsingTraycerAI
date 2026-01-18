@@ -33,6 +33,7 @@
  */
 
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
+import axiosRetry from 'axios-retry';
 import { getAccessToken, getRefreshToken, saveTokens, clearTokens } from '../utils/tokenStorage';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:3000/api';
@@ -43,8 +44,37 @@ const api: AxiosInstance = axios.create({
   timeout: 30000, // 30 seconds
 });
 
+// Configure axios-retry
+axiosRetry(api, {
+  retries: 3,
+  retryDelay: axiosRetry.exponentialDelay, // 1s, 2s, 4s
+  retryCondition: (error) => {
+    // Retry on network errors and specific HTTP status codes
+    return (
+      axiosRetry.isNetworkOrIdempotentRequestError(error) ||
+      error.code === 'ECONNABORTED' ||
+      error.code === 'ETIMEDOUT' ||
+      error.code === 'ENOTFOUND' ||
+      error.code === 'ENETUNREACH' ||
+      error.response?.status === 408 || // Request Timeout
+      error.response?.status === 429 || // Too Many Requests
+      error.response?.status === 503 || // Service Unavailable
+      error.response?.status === 504 // Gateway Timeout
+    );
+  },
+  onRetry: (retryCount, error, requestConfig) => {
+    console.log(`[API Retry] Attempt ${retryCount} for ${requestConfig.url}:`, error.message);
+    
+    // Add retry attempt counter to headers
+    if (requestConfig.headers) {
+      requestConfig.headers['X-Retry-Count'] = retryCount.toString();
+    }
+  },
+});
+
 let isRefreshing = false;
 let refreshSubscribers: ((token: string) => void)[] = [];
+const pendingRequests = new Map<string, boolean>();
 
 /**
  * Subscribe to token refresh
@@ -62,7 +92,7 @@ const addRefreshSubscriber = (callback: (token: string) => void) => {
 };
 
 /**
- * Request interceptor to attach authorization token
+ * Request interceptor to attach authorization token and prevent duplicates
  */
 api.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
@@ -70,6 +100,22 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // Request deduplication
+    const requestKey = `${config.method}-${config.url}-${JSON.stringify(config.params)}`;
+    if (pendingRequests.has(requestKey)) {
+      console.log(`[API] Duplicate request blocked: ${requestKey}`);
+      return Promise.reject(new Error('Duplicate request'));
+    }
+    pendingRequests.set(requestKey, true);
+    
+    // Clean up after response
+    if (config.signal) {
+      config.signal.addEventListener('abort', () => {
+        pendingRequests.delete(requestKey);
+      });
+    }
+    
     return config;
   },
   (error) => {
@@ -81,12 +127,23 @@ api.interceptors.request.use(
  * Response interceptor to handle token refresh and errors
  */
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Clear request from pending map
+    const requestKey = `${response.config.method}-${response.config.url}-${JSON.stringify(response.config.params)}`;
+    pendingRequests.delete(requestKey);
+    return response;
+  },
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+    
+    // Clear request from pending map
+    if (originalRequest) {
+      const requestKey = `${originalRequest.method}-${originalRequest.url}-${JSON.stringify(originalRequest.params)}`;
+      pendingRequests.delete(requestKey);
+    }
 
     // Handle 401 Unauthorized - Token expired
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
       if (isRefreshing) {
         return new Promise((resolve) => {
           addRefreshSubscriber((token: string) => {

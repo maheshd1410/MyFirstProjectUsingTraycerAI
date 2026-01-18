@@ -11,7 +11,13 @@ import { logoutUser } from '../auth/authSlice';
 const initialState: OrderState = {
   orders: [],
   selectedOrder: null,
-  loading: false,
+  loading: {
+    fetch: false,
+    refresh: false,
+    loadMore: false,
+    action: false,
+    upload: false,
+  },
   error: null,
   pagination: {
     currentPage: 1,
@@ -84,7 +90,13 @@ const orderSlice = createSlice({
     resetOrders: (state) => {
       state.orders = [];
       state.selectedOrder = null;
-      state.loading = false;
+      state.loading = {
+        fetch: false,
+        refresh: false,
+        loadMore: false,
+        action: false,
+        upload: false,
+      };
       state.error = null;
       state.pagination = {
         currentPage: 1,
@@ -100,62 +112,69 @@ const orderSlice = createSlice({
   extraReducers: (builder) => {
     // Fetch Orders
     builder
-      .addCase(fetchOrders.pending, (state) => {
-        state.loading = true;
+      .addCase(fetchOrders.pending, (state, action) => {
+        // Use fetch for first page, loadMore for pagination
+        if (action.meta.arg?.page === 1 || !action.meta.arg?.page) {
+          state.loading.fetch = true;
+        } else {
+          state.loading.loadMore = true;
+        }
         state.error = null;
       })
       .addCase(fetchOrders.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loading.fetch = false;
+        state.loading.loadMore = false;
         // action.payload is PaginatedOrders with orders and pagination metadata from backend
         state.orders = action.payload.orders;
         state.pagination = action.payload.pagination;
       })
       .addCase(fetchOrders.rejected, (state, action) => {
-        state.loading = false;
+        state.loading.fetch = false;
+        state.loading.loadMore = false;
         state.error = action.payload as string;
       });
 
     // Fetch Order By ID
     builder
       .addCase(fetchOrderById.pending, (state) => {
-        state.loading = true;
+        state.loading.fetch = true;
         state.error = null;
       })
       .addCase(fetchOrderById.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loading.fetch = false;
         state.selectedOrder = action.payload;
       })
       .addCase(fetchOrderById.rejected, (state, action) => {
-        state.loading = false;
+        state.loading.fetch = false;
         state.error = action.payload as string;
       });
 
     // Create Order
     builder
       .addCase(createOrder.pending, (state) => {
-        state.loading = true;
+        state.loading.action = true;
         state.error = null;
       })
       .addCase(createOrder.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loading.action = false;
         // Set selectedOrder to the newly created order
         state.selectedOrder = action.payload;
         // Don't modify orders/pagination here - let UI refetch orders if needed
         // This prevents inconsistency when creating order with filters applied
       })
       .addCase(createOrder.rejected, (state, action) => {
-        state.loading = false;
+        state.loading.action = false;
         state.error = action.payload as string;
       });
 
     // Cancel Order
     builder
       .addCase(cancelOrder.pending, (state) => {
-        state.loading = true;
+        state.loading.action = true;
         state.error = null;
       })
       .addCase(cancelOrder.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loading.action = false;
         // Update the order in the orders array if present
         const index = state.orders.findIndex((o) => o.id === action.payload.id);
         if (index !== -1) {
@@ -168,7 +187,7 @@ const orderSlice = createSlice({
         // Don't modify pagination here - let UI refetch orders if needed to get accurate counts
       })
       .addCase(cancelOrder.rejected, (state, action) => {
-        state.loading = false;
+        state.loading.action = false;
         state.error = action.payload as string;
       });
 
@@ -176,7 +195,13 @@ const orderSlice = createSlice({
     builder.addCase(logoutUser.fulfilled, (state) => {
       state.orders = [];
       state.selectedOrder = null;
-      state.loading = false;
+      state.loading = {
+        fetch: false,
+        refresh: false,
+        loadMore: false,
+        action: false,
+        upload: false,
+      };
       state.error = null;
       state.pagination = {
         currentPage: 1,

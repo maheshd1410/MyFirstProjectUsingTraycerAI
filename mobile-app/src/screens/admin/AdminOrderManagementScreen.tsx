@@ -6,7 +6,11 @@ import {
   TouchableOpacity,
   Text,
   ActivityIndicator,
+  RefreshControl,
+  Alert,
+  ScrollView,
 } from 'react-native';
+import { useNetInfo } from '@react-native-community/netinfo';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
@@ -35,12 +39,24 @@ export const AdminOrderManagementScreen: React.FC<AdminOrderManagementScreenProp
   const dispatch = useAppDispatch();
   const orders = useAppSelector(selectAdminOrders);
   const loading = useAppSelector(selectAdminLoading);
+  const { isConnected } = useNetInfo();
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [filteredOrders, setFilteredOrders] = useState(orders);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     dispatch(fetchAdminOrders({ page: 1, pageSize: 20 }) as any);
   }, [dispatch]);
+
+  const handleRefresh = async () => {
+    if (!isConnected) {
+      Alert.alert('Offline', 'You are currently offline. Pull-to-refresh requires an internet connection.');
+      return;
+    }
+    setRefreshing(true);
+    await dispatch(fetchAdminOrders({ page: 1, pageSize: 20 }) as any).unwrap().catch(() => {});
+    setRefreshing(false);
+  };
 
   useEffect(() => {
     if (selectedStatus) {
@@ -139,7 +155,7 @@ export const AdminOrderManagementScreen: React.FC<AdminOrderManagementScreenProp
       </View>
 
       {/* Orders List */}
-      {loading && !filteredOrders.length ? (
+      {loading.fetch && !filteredOrders.length ? (
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
         </View>
@@ -149,6 +165,13 @@ export const AdminOrderManagementScreen: React.FC<AdminOrderManagementScreenProp
           renderItem={renderOrderItem}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={theme.colors.primary}
+            />
+          }
           ListEmptyComponent={
             <View style={styles.centerContainer}>
               <Ionicons name="document-outline" size={48} color={theme.colors.textLight} />

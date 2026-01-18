@@ -6,6 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "scheme": "ladoobusiness",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -21,6 +22,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.ladoobusiness.app",
       "buildNumber": "1",
+      "associatedDomains": ["applinks:yourdomain.com"],
       "infoPlist": {
         "NSCameraUsageDescription": "This app needs access to the camera to take photos of products.",
         "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to select product images.",
@@ -34,6 +36,23 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
       },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "yourdomain.com",
+              "pathPrefix": "/--/auth/callback"
+            },
+            {
+              "scheme": "ladoobusiness"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ],
       "permissions": [
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
@@ -45,3 +64,4 @@
     }
   }
 }
+

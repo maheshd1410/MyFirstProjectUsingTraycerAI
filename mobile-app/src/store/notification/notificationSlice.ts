@@ -5,7 +5,13 @@ import { Notification } from '../../services/notification.service';
 interface NotificationState {
   notifications: Notification[];
   unreadCount: number;
-  loading: boolean;
+  loading: {
+    fetch: boolean;
+    refresh: boolean;
+    loadMore: boolean;
+    action: boolean;
+    upload: boolean;
+  };
   error: string | null;
   page: number;
   hasMore: boolean;
@@ -14,7 +20,13 @@ interface NotificationState {
 const initialState: NotificationState = {
   notifications: [],
   unreadCount: 0,
-  loading: false,
+  loading: {
+    fetch: false,
+    refresh: false,
+    loadMore: false,
+    action: false,
+    upload: false,
+  },
   error: null,
   page: 1,
   hasMore: true,
@@ -69,12 +81,18 @@ const notificationSlice = createSlice({
   extraReducers: (builder) => {
     builder
       // Fetch notifications
-      .addCase(fetchNotifications.pending, (state) => {
-        state.loading = true;
+      .addCase(fetchNotifications.pending, (state, action) => {
+        // Use fetch for first page, loadMore for pagination
+        if (action.meta.arg?.page === 1 || !action.meta.arg?.page) {
+          state.loading.fetch = true;
+        } else {
+          state.loading.loadMore = true;
+        }
         state.error = null;
       })
       .addCase(fetchNotifications.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loading.fetch = false;
+        state.loading.loadMore = false;
         if (action.meta.arg.page === 1) {
           state.notifications = action.payload.notifications;
         } else {
@@ -85,7 +103,8 @@ const notificationSlice = createSlice({
         state.unreadCount = action.payload.notifications.filter(n => !n.isRead).length;
       })
       .addCase(fetchNotifications.rejected, (state, action) => {
-        state.loading = false;
+        state.loading.fetch = false;
+        state.loading.loadMore = false;
         state.error = action.error.message || 'Failed to fetch notifications';
       })
 

@@ -58,6 +58,12 @@ export const ProfileScreen = () => {
       onPress: () => (navigation as any).navigate('AddressList'),
     },
     {
+      id: 'offline-queue',
+      icon: 'cloud-offline-outline',
+      label: 'Offline Queue',
+      onPress: () => (navigation as any).navigate('OfflineQueue'),
+    },
+    {
       id: 'notifications',
       icon: 'notifications-outline',
       label: 'Notifications',

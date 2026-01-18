@@ -3,6 +3,7 @@ import * as Notifications from 'expo-notifications';
 import * as authService from '../../services/auth.service';
 import * as notificationService from '../../services/notification.service';
 import * as tokenStorage from '../../utils/tokenStorage';
+import { oauthService } from '../../services/oauth.service';
 import { AuthState, User, LoginCredentials, RegisterData } from '../../types';
 
 const initialState: AuthState = {
@@ -91,6 +92,84 @@ export const logoutUser = createAsyncThunk(
       return null;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.error || 'Logout failed');
+    }
+  }
+);
+
+/**
+ * Async thunk for Google OAuth login
+ */
+export const loginWithGoogle = createAsyncThunk(
+  'auth/loginWithGoogle',
+  async (_, { rejectWithValue }) => {
+    try {
+      const callbackUrl = await oauthService.initiateGoogleAuth();
+      const response = await authService.loginWithOAuth('google', callbackUrl);
+      await tokenStorage.saveTokens(response.accessToken, response.refreshToken);
+      
+      // Register FCM token after successful login
+      await registerFcmToken();
+      
+      return response;
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Google login failed');
+    }
+  }
+);
+
+/**
+ * Async thunk for Apple OAuth login
+ */
+export const loginWithApple = createAsyncThunk(
+  'auth/loginWithApple',
+  async (_, { rejectWithValue }) => {
+    try {
+      const callbackUrl = await oauthService.initiateAppleAuth();
+      const response = await authService.loginWithOAuth('apple', callbackUrl);
+      await tokenStorage.saveTokens(response.accessToken, response.refreshToken);
+      
+      // Register FCM token after successful login
+      await registerFcmToken();
+      
+      return response;
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Apple login failed');
+    }
+  }
+);
+
+/**
+ * Async thunk for linking OAuth account
+ */
+export const linkOAuthAccount = createAsyncThunk(
+  'auth/linkOAuthAccount',
+  async ({ provider, accessToken }: { provider: 'google' | 'apple'; accessToken: string }, { rejectWithValue }) => {
+    try {
+      await oauthService.linkOAuthAccount(provider, accessToken);
+      
+      // Fetch updated user data
+      const user = await authService.getCurrentUser();
+      return user;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.error || 'Failed to link OAuth account');
+    }
+  }
+);
+
+/**
+ * Async thunk for unlinking OAuth account
+ */
+export const unlinkOAuthAccount = createAsyncThunk(
+  'auth/unlinkOAuthAccount',
+  async (provider: 'google' | 'apple', { rejectWithValue }) => {
+    try {
+      await oauthService.unlinkOAuthAccount(provider);
+      
+      // Fetch updated user data
+      const user = await authService.getCurrentUser();
+      return user;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.error || 'Failed to unlink OAuth account');
     }
   }
 );
@@ -195,6 +274,72 @@ const authSlice = createSlice({
         state.isAuthenticated = true;
       })
       .addCase(registerUser.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      });
+
+    // Google Login
+    builder
+      .addCase(loginWithGoogle.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(loginWithGoogle.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.user = action.payload.user;
+        state.accessToken = action.payload.accessToken;
+        state.refreshToken = action.payload.refreshToken;
+        state.isAuthenticated = true;
+      })
+      .addCase(loginWithGoogle.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      });
+
+    // Apple Login
+    builder
+      .addCase(loginWithApple.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(loginWithApple.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.user = action.payload.user;
+        state.accessToken = action.payload.accessToken;
+        state.refreshToken = action.payload.refreshToken;
+        state.isAuthenticated = true;
+      })
+      .addCase(loginWithApple.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      });
+
+    // Link OAuth Account
+    builder
+      .addCase(linkOAuthAccount.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(linkOAuthAccount.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.user = action.payload;
+      })
+      .addCase(linkOAuthAccount.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      });
+
+    // Unlink OAuth Account
+    builder
+      .addCase(unlinkOAuthAccount.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(unlinkOAuthAccount.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.user = action.payload;
+      })
+      .addCase(unlinkOAuthAccount.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
       });

@@ -5,7 +5,13 @@ import { RootState } from '../index';
 
 const initialState: ProfileState = {
   user: null,
-  isLoading: false,
+  isLoading: {
+    fetch: false,
+    refresh: false,
+    loadMore: false,
+    action: false,
+    upload: false,
+  },
   error: null,
 };
 
@@ -51,32 +57,32 @@ const profileSlice = createSlice({
     // Update user profile
     builder
       .addCase(updateUserProfile.pending, (state) => {
-        state.isLoading = true;
+        state.isLoading.action = true;
         state.error = null;
       })
       .addCase(updateUserProfile.fulfilled, (state, action) => {
-        state.isLoading = false;
+        state.isLoading.action = false;
         state.user = action.payload;
         // Note: The auth slice will be updated separately in the component
       })
       .addCase(updateUserProfile.rejected, (state, action) => {
-        state.isLoading = false;
+        state.isLoading.action = false;
         state.error = action.payload as string;
       });
 
     // Upload profile image
     builder
       .addCase(uploadProfileImage.pending, (state) => {
-        state.isLoading = true;
+        state.isLoading.upload = true;
         state.error = null;
       })
       .addCase(uploadProfileImage.fulfilled, (state, action) => {
-        state.isLoading = false;
+        state.isLoading.upload = false;
         state.user = action.payload;
         // Note: The auth slice will be updated separately in the component
       })
       .addCase(uploadProfileImage.rejected, (state, action) => {
-        state.isLoading = false;
+        state.isLoading.upload = false;
         state.error = action.payload as string;
       });
   },

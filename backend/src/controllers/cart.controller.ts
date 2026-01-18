@@ -33,7 +33,7 @@ export const addItemToCart = async (req: Request, res: Response) => {
     }
 
     const userId = req.user.userId;
-    const { productId, quantity } = req.body;
+    const { productId, quantity, variantId } = req.body;
 
     // Validate request body
     if (!productId || quantity === undefined) {
@@ -44,7 +44,7 @@ export const addItemToCart = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Quantity must be a positive integer' });
     }
 
-    const cart: CartResponse = await cartService.addItem(userId, productId, quantity);
+    const cart: CartResponse = await cartService.addItem(userId, productId, quantity, variantId);
 
     return res.status(200).json(cart);
   } catch (error) {

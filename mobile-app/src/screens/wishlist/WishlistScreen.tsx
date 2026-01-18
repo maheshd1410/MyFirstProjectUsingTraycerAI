@@ -9,6 +9,7 @@ import {
   SafeAreaView,
   ActivityIndicator,
   Alert,
+  RefreshControl,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
@@ -22,11 +23,13 @@ import {
   selectWishlistItemCount,
 } from '../../store/wishlist/wishlistSlice';
 import { addToCart } from '../../store/cart/cartSlice';
-import { Button } from '../../components';
+import { Button, OfflineBanner, WishlistItemSkeleton } from '../../components';
 import { theme } from '../../theme';
 import { WishlistItem } from '../../types';
 import { AppStackParamList } from '../../navigation/AppNavigator';
 import { useNavigation } from '@react-navigation/native';
+import { useNetworkStatus } from '../../utils/network';
+import { formatErrorForDisplay } from '../../utils/errorMessages';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'MainTabs'>;
 
@@ -35,25 +38,43 @@ type WishlistNavigation = Props['navigation'];
 export const WishlistScreen: React.FC = () => {
   const dispatch = useAppDispatch();
   const navigation = useNavigation<WishlistNavigation>();
+  const { isConnected } = useNetworkStatus();
   const items = useAppSelector(selectWishlistItems);
   const loading = useAppSelector(selectWishlistLoading);
   const error = useAppSelector(selectWishlistError);
   const itemCount = useAppSelector(selectWishlistItemCount);
+  const [refreshing, setRefreshing] = React.useState(false);
 
   useEffect(() => {
     dispatch(fetchWishlist());
   }, [dispatch]);
 
+  const handleRefresh = async () => {
+    if (!isConnected) {
+      Alert.alert('Offline', 'Cannot refresh while offline. Showing cached wishlist.');
+      return;
+    }
+    setRefreshing(true);
+    await dispatch(fetchWishlist()).unwrap().catch(() => {});
+    setRefreshing(false);
+  };
+
   const handleRemoveItem = (productId: string) => {
+    if (!isConnected) {
+      Alert.alert('Offline', 'Removed from wishlist (will sync when online)');
+    }
     dispatch(removeFromWishlistAsync(productId));
   };
 
   const handleAddToCart = async (productId: string) => {
+    if (!isConnected) {
+      Alert.alert('Offline', 'Added to cart (will sync when online)');
+    }
     try {
       await dispatch(addToCart({ productId, quantity: 1 })).unwrap();
       Alert.alert('Success', 'Added to cart');
     } catch (err) {
-      const message = typeof err === 'string' ? err : 'Failed to add to cart';
+      const message = formatErrorForDisplay(err);
       Alert.alert('Error', message);
     }
   };
@@ -148,13 +169,15 @@ export const WishlistScreen: React.FC = () => {
     </View>
   );
 
-  if (loading && items.length === 0) {
+  if (loading.fetch && items.length === 0) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={styles.loadingText}>Loading wishlist...</Text>
-        </View>
+        <FlatList
+          data={Array.from({ length: 8 })}
+          renderItem={() => <WishlistItemSkeleton />}
+          keyExtractor={(_, index) => `skeleton-${index}`}
+          contentContainerStyle={styles.listContent}
+        />
       </SafeAreaView>
     );
   }
@@ -162,10 +185,15 @@ export const WishlistScreen: React.FC = () => {
   if (error) {
     return (
       <SafeAreaView style={styles.container}>
+        <OfflineBanner />
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Failed to load wishlist</Text>
-          <Text style={styles.errorMessage}>{error}</Text>
-          <Button title="Retry" onPress={() => dispatch(fetchWishlist())} />
+          <Text style={styles.errorMessage}>{formatErrorForDisplay(error)}</Text>
+          <Button 
+            title="Retry" 
+            onPress={() => dispatch(fetchWishlist())} 
+            disabled={!isConnected}
+          />
         </View>
       </SafeAreaView>
     );
@@ -173,6 +201,14 @@ export const WishlistScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <OfflineBanner />
+      {!isConnected && items.length > 0 && (
+        <View style={styles.cacheNotice}>
+          <Text style={styles.cacheNoticeText}>
+            📦 Viewing cached wishlist (offline mode)
+          </Text>
+        </View>
+      )}
       {items.length === 0 ? (
         renderEmptyState()
       ) : (
@@ -182,6 +218,13 @@ export const WishlistScreen: React.FC = () => {
             renderItem={renderWishlistItem}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.listContent}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                colors={[theme.colors.primary]}
+              />
+            }
           />
 
           <View style={styles.footer}>
@@ -383,5 +426,17 @@ const styles = StyleSheet.create({
     color: theme.colors.textLight,
     marginBottom: theme.spacing.lg,
     textAlign: 'center',
+  },
+  cacheNotice: {
+    backgroundColor: theme.colors.info + '20',
+    padding: theme.spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.info,
+  },
+  cacheNoticeText: {
+    color: theme.colors.info,
+    fontSize: theme.typography.fontSizes.sm,
+    textAlign: 'center',
+    fontWeight: theme.typography.fontWeights.medium as '500',
   },
 });

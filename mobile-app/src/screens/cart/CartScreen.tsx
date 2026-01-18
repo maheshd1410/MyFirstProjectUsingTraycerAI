@@ -8,6 +8,8 @@ import {
   Image,
   SafeAreaView,
   ActivityIndicator,
+  Alert,
+  RefreshControl,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
@@ -22,7 +24,9 @@ import {
   selectCartTotal,
   selectCartItemCount,
 } from '../../store/cart/cartSlice';
-import { Button } from '../../components';
+import { Button, OfflineBanner, CartItemSkeleton } from '../../components';
+import { useNetworkStatus } from '../../utils/network';
+import { formatErrorForDisplay } from '../../utils/errorMessages';
 import { theme } from '../../theme';
 import { CartItem } from '../../types';
 
@@ -35,17 +39,24 @@ type Props = NativeStackScreenProps<AppStackParamList, 'Cart'>;
 
 export const CartScreen: React.FC<Props> = ({ navigation }) => {
   const dispatch = useAppDispatch();
+  const { isConnected } = useNetworkStatus();
   const items = useAppSelector(selectCartItems);
   const loading = useAppSelector(selectCartLoading);
   const error = useAppSelector(selectCartError);
   const totalAmount = useAppSelector(selectCartTotal);
   const itemCount = useAppSelector(selectCartItemCount);
+  const [refreshing, setRefreshing] = React.useState(false);
 
   useEffect(() => {
-    dispatch(fetchCart());
-  }, [dispatch]);
+    if (isConnected) {
+      dispatch(fetchCart());
+    }
+  }, [dispatch, isConnected]);
 
   const handleQuantityIncrease = (item: CartItem) => {
+    if (!isConnected) {
+      Alert.alert('Offline', 'Changes will be synced when you\'re back online');
+    }
     dispatch(updateCartItem({ itemId: item.id, quantity: item.quantity + 1 }));
   };
 
@@ -67,6 +78,16 @@ export const CartScreen: React.FC<Props> = ({ navigation }) => {
     navigation.navigate('ProductList');
   };
 
+  const handleRefresh = async () => {
+    if (!isConnected) {
+      Alert.alert('Offline', 'Cannot refresh while offline. Showing cached cart.');
+      return;
+    }
+    setRefreshing(true);
+    await dispatch(fetchCart()).unwrap().catch(() => {});
+    setRefreshing(false);
+  };
+
   const renderCartItem = ({ item }: { item: CartItem }) => {
     const displayPrice = item.discountPrice ? parseFloat(item.discountPrice) : parseFloat(item.price);
     const originalPrice = parseFloat(item.price);
@@ -80,6 +101,24 @@ export const CartScreen: React.FC<Props> = ({ navigation }) => {
           <Text style={styles.itemName} numberOfLines={2}>
             {item.productName}
           </Text>
+
+          {item.variantName && (
+            <Text style={styles.variantInfo} numberOfLines={1}>
+              {item.variantName}
+            </Text>
+          )}
+
+          {item.variantAttributes && Object.keys(item.variantAttributes).length > 0 && (
+            <View style={styles.variantAttributesTags}>
+              {Object.entries(item.variantAttributes).map(([key, value]) => (
+                <View key={key} style={styles.variantAttribute}>
+                  <Text style={styles.variantAttributeText}>
+                    {key}: {value}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
 
           <View style={styles.priceContainer}>
             {hasDiscount ? (
@@ -132,13 +171,15 @@ export const CartScreen: React.FC<Props> = ({ navigation }) => {
     </View>
   );
 
-  if (loading && items.length === 0) {
+  if (loading.fetch && items.length === 0) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={styles.loadingText}>Loading cart...</Text>
-        </View>
+        <FlatList
+          data={Array.from({ length: 5 })}
+          renderItem={() => <CartItemSkeleton />}
+          keyExtractor={(_, index) => `skeleton-${index}`}
+          contentContainerStyle={styles.listContent}
+        />
       </SafeAreaView>
     );
   }
@@ -146,12 +187,14 @@ export const CartScreen: React.FC<Props> = ({ navigation }) => {
   if (error) {
     return (
       <SafeAreaView style={styles.container}>
+        <OfflineBanner />
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Failed to load cart</Text>
-          <Text style={styles.errorMessage}>{error}</Text>
+          <Text style={styles.errorMessage}>{formatErrorForDisplay(error)}</Text>
           <Button
             title="Retry"
             onPress={() => dispatch(fetchCart())}
+            disabled={!isConnected}
           />
         </View>
       </SafeAreaView>
@@ -160,6 +203,7 @@ export const CartScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <OfflineBanner />
       {items.length === 0 ? (
         renderEmptyCart()
       ) : (
@@ -170,6 +214,13 @@ export const CartScreen: React.FC<Props> = ({ navigation }) => {
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.listContent}
             scrollEnabled={true}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                colors={[theme.colors.primary]}
+              />
+            }
           />
 
           <View style={styles.summaryContainer}>
@@ -183,16 +234,37 @@ export const CartScreen: React.FC<Props> = ({ navigation }) => {
               <Text style={styles.totalValue}>₹{parseFloat(totalAmount).toFixed(2)}</Text>
             </View>
 
+            {!isConnected && (
+              <View style={styles.offlineNotice}>
+                <Text style={styles.offlineNoticeText}>
+                  ⚠️ Checkout requires internet connection
+                </Text>
+              </View>
+            )}
+
             <Button
               title="Proceed to Checkout"
-              onPress={() => navigation.navigate('Checkout' as never)}
-              style={styles.checkoutButton}
+              onPress={() => {
+                if (!isConnected) {
+                  Alert.alert(
+                    'Offline',
+                    'Please connect to the internet to proceed with checkout'
+                  );
+                } else {
+                  navigation.navigate('Checkout' as never);
+                }
+              }}
+              style={[
+                styles.checkoutButton,
+                !isConnected && styles.checkoutButtonDisabled,
+              ]}
+              disabled={!isConnected}
             />
 
             <TouchableOpacity
               style={styles.clearButton}
               onPress={handleClearCart}
-              disabled={loading}
+              disabled={loading.action}
             >
               <Text style={styles.clearButtonText}>Clear Cart</Text>
             </TouchableOpacity>
@@ -378,6 +450,23 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.md,
     marginBottom: theme.spacing.sm,
   },
+  checkoutButtonDisabled: {
+    opacity: 0.5,
+  },
+  offlineNotice: {
+    backgroundColor: theme.colors.warning + '20',
+    padding: theme.spacing.md,
+    borderRadius: 8,
+    marginTop: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.colors.warning,
+  },
+  offlineNoticeText: {
+    color: theme.colors.warning,
+    fontSize: theme.typography.fontSizes.sm,
+    textAlign: 'center',
+    fontWeight: theme.typography.fontWeights.medium as any,
+  },
   clearButton: {
     paddingVertical: theme.spacing.md,
     alignItems: 'center',
@@ -390,4 +479,25 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.fontSizes.base,
     fontWeight: theme.typography.fontWeights.semibold as any,
   },
-});
+  variantInfo: {
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.primary,
+    fontWeight: theme.typography.fontWeights.semibold as any,
+    marginTop: 4,
+  },
+  variantAttributesTags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 6,
+    gap: 6,
+  },
+  variantAttribute: {
+    backgroundColor: theme.colors.surface,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  variantAttributeText: {
+    fontSize: theme.typography.fontSizes.xs,
+    color: theme.colors.textLight,
+  },

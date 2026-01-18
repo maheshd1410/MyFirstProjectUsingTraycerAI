@@ -1,5 +1,6 @@
-import React, { useEffect } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity, Text, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, StyleSheet, FlatList, TouchableOpacity, Text, ActivityIndicator, RefreshControl, Alert } from 'react-native';
+import { useNetInfo } from '@react-native-community/netinfo';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
   fetchAddresses,
@@ -17,10 +18,22 @@ export const AddressListScreen = ({ navigation }: any) => {
   const addresses = useAppSelector(selectAddresses);
   const loading = useAppSelector(selectAddressLoading);
   const error = useAppSelector(selectAddressError);
+  const { isConnected } = useNetInfo();
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     dispatch(fetchAddresses() as any);
   }, [dispatch]);
+
+  const handleRefresh = async () => {
+    if (!isConnected) {
+      Alert.alert('Offline', 'You are currently offline. Pull-to-refresh requires an internet connection.');
+      return;
+    }
+    setRefreshing(true);
+    await dispatch(fetchAddresses() as any).unwrap().catch(() => {});
+    setRefreshing(false);
+  };
 
   const handleSelectAddress = (address: Address) => {
     // Dispatch to store selected address in Redux
@@ -95,7 +108,7 @@ export const AddressListScreen = ({ navigation }: any) => {
     </TouchableOpacity>
   );
 
-  if (loading) {
+  if (loading.fetch && addresses.length === 0) {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color="#6200ee" />
@@ -129,6 +142,13 @@ export const AddressListScreen = ({ navigation }: any) => {
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.listContent}
             scrollEnabled={true}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                tintColor="#6200ee"
+              />
+            }
           />
           <TouchableOpacity
             style={styles.floatingButton}

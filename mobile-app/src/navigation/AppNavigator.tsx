@@ -33,10 +33,12 @@ import {
   AdminUserManagementScreen,
   AdminUserDetailScreen,
 } from '../screens';
+import { OfflineQueueScreen } from '../screens/profile/OfflineQueueScreen';
 
 export type AppStackParamList = {
   MainTabs: undefined;
   EditProfile: undefined;
+  OfflineQueue: undefined;
   ProductDetail: { productId: string };
   Cart: undefined;
   AddressList: undefined;
@@ -219,6 +221,14 @@ export const AppNavigator: React.FC = () => {
         component={EditProfileScreen}
         options={{
           title: 'Edit Profile',
+          headerBackTitle: 'Back',
+        }}
+      />
+      <Stack.Screen
+        name="OfflineQueue"
+        component={OfflineQueueScreen}
+        options={{
+          title: 'Offline Queue',
           headerBackTitle: 'Back',
         }}
       />

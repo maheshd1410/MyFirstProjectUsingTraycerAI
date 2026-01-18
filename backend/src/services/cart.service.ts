@@ -27,7 +27,14 @@ export class CartService {
   async getCart(userId: string): Promise<CartResponse> {
     const cart = await prisma.cart.findUnique({
       where: { userId },
-      include: { items: { include: { product: { include: { category: true } } } } },
+      include: {
+        items: {
+          include: {
+            product: { include: { category: true } },
+            variant: true,
+          },
+        },
+      },
     });
 
     if (!cart) {
@@ -48,7 +55,7 @@ export class CartService {
   /**
    * Add item to cart
    */
-  async addItem(userId: string, productId: string, quantity: number): Promise<CartResponse> {
+  async addItem(userId: string, productId: string, quantity: number, variantId?: string): Promise<CartResponse> {
     // Validate product exists and is active
     const product = await prisma.product.findFirst({
       where: { id: productId, isActive: true },
@@ -58,34 +65,52 @@ export class CartService {
       throw new Error('Product not found');
     }
 
+    // If variantId provided, validate and check variant stock
+    let variant = null;
+    if (variantId) {
+      variant = await prisma.productVariant.findFirst({
+        where: { id: variantId, productId, isActive: true },
+      });
+
+      if (!variant) {
+        throw new Error('Variant not found');
+      }
+
+      if (variant.stockQuantity < quantity) {
+        throw new Error('Insufficient variant stock');
+      }
+    } else {
+      // Check product stock if no variant
+      if (product.stockQuantity < quantity) {
+        throw new Error('Insufficient stock');
+      }
+    }
+
     // Validate quantity is positive
     if (quantity <= 0) {
       throw new Error('Quantity must be positive');
     }
 
-    // Check stock availability
-    if (product.stockQuantity < quantity) {
-      throw new Error('Insufficient stock');
-    }
-
     // Get or create cart for user
     const cart = await this.getOrCreateCart(userId);
 
-    // Check if item already exists in cart
+    // Check if item already exists in cart (considering variant)
     const existingItem = await prisma.cartItem.findUnique({
       where: {
-        cartId_productId: {
+        cartId_productId_variantId: {
           cartId: cart.id,
           productId,
+          variantId: variantId || null,
         },
       },
     });
 
     if (existingItem) {
       const newQuantity = existingItem.quantity + quantity;
+      const stockToCheck = variant ? variant.stockQuantity : product.stockQuantity;
 
       // Check stock availability for updated quantity
-      if (product.stockQuantity < newQuantity) {
+      if (stockToCheck < newQuantity) {
         throw new Error('Insufficient stock');
       }
 
@@ -100,6 +125,7 @@ export class CartService {
         data: {
           cartId: cart.id,
           productId,
+          variantId: variantId || null,
           quantity,
         },
       });
@@ -117,10 +143,14 @@ export class CartService {
       throw new Error('Quantity must be positive');
     }
 
-    // Find cart item
+    // Find cart item with product and variant
     const cartItem = await prisma.cartItem.findUnique({
       where: { id: itemId },
-      include: { cart: true, product: true },
+      include: { 
+        cart: true, 
+        product: true,
+        variant: true,
+      },
     });
 
     if (!cartItem) {
@@ -130,6 +160,17 @@ export class CartService {
     // Verify item belongs to user's cart
     if (cartItem.cart.userId !== userId) {
       throw new Error('Unauthorized');
+    }
+
+    // Validate stock against variant or product
+    if (cartItem.variantId && cartItem.variant) {
+      if (cartItem.variant.stockQuantity < quantity) {
+        throw new Error('Insufficient variant stock');
+      }
+    } else {
+      if (cartItem.product.stockQuantity < quantity) {
+        throw new Error('Insufficient stock');
+      }
     }
 
     // Check stock availability
@@ -198,10 +239,17 @@ export class CartService {
     const items: CartItemResponse[] = cart.items.map((item: any) => {
       totalItems += item.quantity;
 
-      const price = parseFloat(item.product.price.toString());
-      const discountPrice = item.product.discountPrice
+      // Use variant price if available, otherwise product price
+      const price = item.variant?.price
+        ? parseFloat(item.variant.price.toString())
+        : parseFloat(item.product.price.toString());
+      
+      const discountPrice = item.variant?.discountPrice
+        ? parseFloat(item.variant.discountPrice.toString())
+        : item.product.discountPrice
         ? parseFloat(item.product.discountPrice.toString())
         : null;
+
       const finalPrice = discountPrice || price;
       const subtotal = finalPrice * item.quantity;
 
@@ -216,6 +264,9 @@ export class CartService {
         discountPrice: discountPrice ? discountPrice.toString() : undefined,
         quantity: item.quantity,
         subtotal: subtotal.toString(),
+        variantId: item.variantId,
+        variantName: item.variant?.name,
+        variantAttributes: item.variant?.attributes,
         createdAt: item.createdAt,
       };
     });

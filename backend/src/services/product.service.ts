@@ -131,6 +131,10 @@ export class ProductService {
       where: { id, isActive: true },
       include: {
         category: true,
+        variants: {
+          where: { isActive: true },
+          orderBy: { sortOrder: 'asc' },
+        },
       },
     });
 
@@ -501,6 +505,21 @@ export class ProductService {
       isFeatured: product.isFeatured,
       averageRating: product.averageRating.toString(),
       totalReviews: product.totalReviews,
+      variants: product.variants?.map((v: any) => ({
+        id: v.id,
+        productId: v.productId,
+        sku: v.sku,
+        name: v.name,
+        attributes: v.attributes,
+        price: v.price?.toString(),
+        discountPrice: v.discountPrice?.toString(),
+        stockQuantity: v.stockQuantity,
+        lowStockThreshold: v.lowStockThreshold,
+        isActive: v.isActive,
+        sortOrder: v.sortOrder,
+        createdAt: v.createdAt,
+        updatedAt: v.updatedAt,
+      })),
       createdAt: product.createdAt,
       updatedAt: product.updatedAt,
     };

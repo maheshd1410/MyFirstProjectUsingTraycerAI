@@ -73,7 +73,13 @@ export const setDefaultAddress = createAsyncThunk(
 const initialState: AddressState = {
   addresses: [],
   selectedAddress: null,
-  loading: false,
+  loading: {
+    fetch: false,
+    refresh: false,
+    loadMore: false,
+    action: false,
+    upload: false,
+  },
   error: null,
 };
 
@@ -90,7 +96,13 @@ const addressSlice = createSlice({
     logoutUser: (state) => {
       state.addresses = [];
       state.selectedAddress = null;
-      state.loading = false;
+      state.loading = {
+        fetch: false,
+        refresh: false,
+        loadMore: false,
+        action: false,
+        upload: false,
+      };
       state.error = null;
     },
   },
@@ -98,41 +110,41 @@ const addressSlice = createSlice({
     // Fetch Addresses
     builder
       .addCase(fetchAddresses.pending, (state) => {
-        state.loading = true;
+        state.loading.fetch = true;
         state.error = null;
       })
       .addCase(fetchAddresses.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loading.fetch = false;
         state.addresses = action.payload;
       })
       .addCase(fetchAddresses.rejected, (state, action) => {
-        state.loading = false;
+        state.loading.fetch = false;
         state.error = action.payload as string;
       });
 
     // Fetch Address By ID
     builder
       .addCase(fetchAddressById.pending, (state) => {
-        state.loading = true;
+        state.loading.fetch = true;
         state.error = null;
       })
       .addCase(fetchAddressById.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loading.fetch = false;
         state.selectedAddress = action.payload;
       })
       .addCase(fetchAddressById.rejected, (state, action) => {
-        state.loading = false;
+        state.loading.fetch = false;
         state.error = action.payload as string;
       });
 
     // Create Address
     builder
       .addCase(createAddress.pending, (state) => {
-        state.loading = true;
+        state.loading.action = true;
         state.error = null;
       })
       .addCase(createAddress.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loading.action = false;
         // If the created address is default, unset default on existing addresses
         if (action.payload?.isDefault) {
           state.addresses = state.addresses.map((a) => ({ ...a, isDefault: false }));
@@ -140,18 +152,18 @@ const addressSlice = createSlice({
         state.addresses.push(action.payload);
       })
       .addCase(createAddress.rejected, (state, action) => {
-        state.loading = false;
+        state.loading.action = false;
         state.error = action.payload as string;
       });
 
     // Update Address
     builder
       .addCase(updateAddress.pending, (state) => {
-        state.loading = true;
+        state.loading.action = true;
         state.error = null;
       })
       .addCase(updateAddress.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loading.action = false;
         const index = state.addresses.findIndex((a) => a.id === action.payload.id);
         if (index !== -1) {
           state.addresses[index] = action.payload;
@@ -161,36 +173,36 @@ const addressSlice = createSlice({
         }
       })
       .addCase(updateAddress.rejected, (state, action) => {
-        state.loading = false;
+        state.loading.action = false;
         state.error = action.payload as string;
       });
 
     // Delete Address
     builder
       .addCase(deleteAddress.pending, (state) => {
-        state.loading = true;
+        state.loading.action = true;
         state.error = null;
       })
       .addCase(deleteAddress.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loading.action = false;
         state.addresses = state.addresses.filter((a) => a.id !== action.payload);
         if (state.selectedAddress?.id === action.payload) {
           state.selectedAddress = null;
         }
       })
       .addCase(deleteAddress.rejected, (state, action) => {
-        state.loading = false;
+        state.loading.action = false;
         state.error = action.payload as string;
       });
 
     // Set Default Address
     builder
       .addCase(setDefaultAddress.pending, (state) => {
-        state.loading = true;
+        state.loading.action = true;
         state.error = null;
       })
       .addCase(setDefaultAddress.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loading.action = false;
         // Update the addresses list
         state.addresses = state.addresses.map((a) => ({
           ...a,
@@ -199,7 +211,7 @@ const addressSlice = createSlice({
         state.selectedAddress = action.payload;
       })
       .addCase(setDefaultAddress.rejected, (state, action) => {
-        state.loading = false;
+        state.loading.action = false;
         state.error = action.payload as string;
       });
   },

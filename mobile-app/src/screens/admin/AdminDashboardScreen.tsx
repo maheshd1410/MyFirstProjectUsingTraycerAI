@@ -12,7 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LineChart, PieChart } from 'react-native-chart-kit';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { fetchAnalytics, selectAnalytics, selectAdminLoading } from '../../store/admin/adminSlice';
-import { AnalyticsCard } from '../../components';
+import { AnalyticsCard, AnalyticsCardSkeleton } from '../../components';
 import { theme } from '../../theme';
 
 interface AdminDashboardScreenProps {
@@ -36,10 +36,15 @@ export const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({ navi
     });
   };
 
-  if (loading && !analytics) {
+  if (loading.fetch && !analytics) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
+      <View style={styles.container}>
+        <View style={styles.metricsSection}>
+          <AnalyticsCardSkeleton />
+          <AnalyticsCardSkeleton />
+          <AnalyticsCardSkeleton />
+          <AnalyticsCardSkeleton />
+        </View>
       </View>
     );
   }

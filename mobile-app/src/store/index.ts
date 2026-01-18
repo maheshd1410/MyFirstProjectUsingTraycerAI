@@ -1,4 +1,4 @@
-import { configureStore, ThunkAction, Action } from '@reduxjs/toolkit';
+import { configureStore, ThunkAction, Action, combineReducers } from '@reduxjs/toolkit';
 import { persistStore, persistReducer } from 'redux-persist';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import authReducer from './auth/authSlice';
@@ -11,31 +11,39 @@ import notificationReducer from './notification/notificationSlice';
 import profileReducer from './profile/profileSlice';
 import reviewReducer from './review/reviewSlice';
 import adminReducer from './admin/adminSlice';
+import offlineReducer from './offline/offlineSlice';
+import networkReducer from './network/networkSlice';
+import offlineMiddleware from '../middleware/offlineMiddleware';
+
+// Combine all reducers
+const rootReducer = combineReducers({
+  auth: authReducer,
+  product: productReducer,
+  cart: cartReducer,
+  wishlist: wishlistReducer,
+  address: addressReducer,
+  order: orderReducer,
+  profile: profileReducer,
+  notification: notificationReducer,
+  review: reviewReducer,
+  admin: adminReducer,
+  offline: offlineReducer,
+  network: networkReducer,
+});
 
 // Redux persist configuration
 const persistConfig = {
   key: 'root',
   storage: AsyncStorage,
-  whitelist: ['auth'], // Only persist auth state
+  whitelist: ['auth', 'offline', 'product', 'cart', 'wishlist', 'network'], // Persist offline-capable slices
 };
 
-// Persist the auth reducer
-const persistedAuthReducer = persistReducer(persistConfig, authReducer);
+// Apply persistReducer to the root reducer
+const persistedReducer = persistReducer(persistConfig, rootReducer);
 
 // Configure store
 export const store = configureStore({
-  reducer: {
-    auth: persistedAuthReducer,
-    product: productReducer,
-    cart: cartReducer,
-    wishlist: wishlistReducer,
-    address: addressReducer,
-    order: orderReducer,
-    profile: profileReducer,
-    notification: notificationReducer,
-    review: reviewReducer,
-    admin: adminReducer,
-  },
+  reducer: persistedReducer,
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {
@@ -43,7 +51,7 @@ export const store = configureStore({
         ignoredActionPaths: ['payload.user'],
         ignoredPaths: ['auth'],
       },
-    }),
+    }).concat(offlineMiddleware),
 });
 
 // Create persistor

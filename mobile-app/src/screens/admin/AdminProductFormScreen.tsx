@@ -7,6 +7,7 @@ import {
   Text,
   ActivityIndicator,
   Alert,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Formik } from 'formik';
@@ -20,6 +21,7 @@ import {
   selectProductLoading,
 } from '../../store/product/productSlice';
 import { Input, Button } from '../../components';
+import { variantService } from '../../services/variant.service';
 import { theme } from '../../theme';
 
 interface AdminProductFormScreenProps {
@@ -47,6 +49,12 @@ export const AdminProductFormScreen: React.FC<AdminProductFormScreenProps> = ({
   const products = useAppSelector(selectProducts);
   const loading = useAppSelector(selectProductLoading);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [variants, setVariants] = useState<Array<{
+    sku: string;
+    name: string;
+    price?: string;
+    stockQuantity: string;
+  }>>([]);
 
   const productId = route?.params?.productId;
   const existingProduct = productId
@@ -100,16 +108,82 @@ export const AdminProductFormScreen: React.FC<AdminProductFormScreenProps> = ({
         image: selectedImage,
       };
 
+      let productId = productId;
       if (productId) {
         dispatch(updateProduct({ id: productId, ...productData }) as any);
       } else {
-        dispatch(createProduct(productData) as any);
+        const result = await dispatch(createProduct(productData) as any).unwrap();
+        productId = result.id;
       }
 
-      navigation.goBack();
-    } catch (error) {
-      Alert.alert('Error', 'Failed to save product');
+      // Persist variants after product creation/update
+      if (variants.length > 0 && productId) {
+        try {
+          for (const variant of variants) {
+            // Validate variant required fields
+            if (!variant.sku || !variant.name || !variant.stockQuantity) {
+              Alert.alert('Validation Error', 'All variant SKU, name, and stock quantity are required');
+              return;
+            }
+
+            await variantService.createVariant({
+              productId,
+              sku: variant.sku,
+              name: variant.name,
+              price: variant.price || undefined,
+              stockQuantity: parseInt(variant.stockQuantity, 10),
+              lowStockThreshold: 5, // Default low stock threshold
+              sortOrder: variants.indexOf(variant),
+            });
+          }
+          
+          Alert.alert(
+            'Success',
+            `Product and ${variants.length} variant(s) saved successfully!`,
+            [{ text: 'OK', onPress: () => navigation.goBack() }]
+          );
+        } catch (variantError: any) {
+          Alert.alert(
+            'Warning',
+            `Product saved but failed to save some variants: ${variantError.message}`
+          );
+          navigation.goBack();
+        }
+      } else {
+        navigation.goBack();
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to save product');
     }
+  };
+
+  const handleAddVariant = () => {
+    setVariants([
+      ...variants,
+      {
+        sku: '',
+        name: '',
+        price: '',
+        stockQuantity: '',
+      },
+    ]);
+  };
+
+  const handleRemoveVariant = (index: number) => {
+    setVariants(variants.filter((_, i) => i !== index));
+  };
+
+  const handleUpdateVariant = (
+    index: number,
+    field: 'sku' | 'name' | 'price' | 'stockQuantity',
+    value: string
+  ) => {
+    const newVariants = [...variants];
+    newVariants[index] = {
+      ...newVariants[index],
+      [field]: value,
+    };
+    setVariants(newVariants);
   };
 
   return (
@@ -197,6 +271,70 @@ export const AdminProductFormScreen: React.FC<AdminProductFormScreenProps> = ({
                 numberOfLines={4}
               />
 
+              {/* Variant Management Section */}
+              <View style={styles.variantSection}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Product Variants (Optional)</Text>
+                  <Text style={styles.sectionSubtitle}>Add different sizes, colors, or options</Text>
+                </View>
+
+                {variants.map((variant, index) => (
+                  <View key={index} style={styles.variantCard}>
+                    <View style={styles.variantHeader}>
+                      <Text style={styles.variantCardTitle}>Variant {index + 1}</Text>
+                      <TouchableOpacity
+                        onPress={() => handleRemoveVariant(index)}
+                        style={styles.deleteVariantButton}
+                      >
+                        <Ionicons name="trash-outline" size={20} color={theme.colors.error} />
+                      </TouchableOpacity>
+                    </View>
+
+                    <TextInput
+                      style={styles.variantInput}
+                      placeholder="SKU (e.g., PROD-L-RED)"
+                      value={variant.sku}
+                      onChangeText={(value) => handleUpdateVariant(index, 'sku', value)}
+                      placeholderTextColor={theme.colors.textLight}
+                    />
+
+                    <TextInput
+                      style={styles.variantInput}
+                      placeholder="Variant Name (e.g., Large - Red)"
+                      value={variant.name}
+                      onChangeText={(value) => handleUpdateVariant(index, 'name', value)}
+                      placeholderTextColor={theme.colors.textLight}
+                    />
+
+                    <TextInput
+                      style={styles.variantInput}
+                      placeholder="Price Override (optional - leave empty to use product price)"
+                      value={variant.price}
+                      onChangeText={(value) => handleUpdateVariant(index, 'price', value)}
+                      keyboardType="decimal-pad"
+                      placeholderTextColor={theme.colors.textLight}
+                    />
+
+                    <TextInput
+                      style={styles.variantInput}
+                      placeholder="Stock Quantity"
+                      value={variant.stockQuantity}
+                      onChangeText={(value) => handleUpdateVariant(index, 'stockQuantity', value)}
+                      keyboardType="number-pad"
+                      placeholderTextColor={theme.colors.textLight}
+                    />
+                  </View>
+                ))}
+
+                <TouchableOpacity
+                  style={styles.addVariantButton}
+                  onPress={handleAddVariant}
+                >
+                  <Ionicons name="add-circle-outline" size={20} color={theme.colors.primary} />
+                  <Text style={styles.addVariantButtonText}>Add Variant</Text>
+                </TouchableOpacity>
+              </View>
+
               {/* Submit Button */}
               <View style={styles.buttonContainer}>
                 <Button
@@ -253,4 +391,72 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.xl,
     marginBottom: theme.spacing.xl,
   },
-});
+  variantSection: {
+    marginTop: theme.spacing.lg,
+    marginBottom: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+  },
+  sectionHeader: {
+    marginBottom: theme.spacing.lg,
+  },
+  sectionTitle: {
+    fontSize: theme.typography.fontSizes.lg,
+    fontWeight: theme.typography.fontWeights.semibold as any,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.xs,
+  },
+  sectionSubtitle: {
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.textLight,
+  },
+  variantCard: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  variantHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: theme.spacing.md,
+  },
+  variantCardTitle: {
+    fontSize: theme.typography.fontSizes.base,
+    fontWeight: theme.typography.fontWeights.semibold as any,
+    color: theme.colors.text,
+  },
+  deleteVariantButton: {
+    padding: theme.spacing.xs,
+  },
+  variantInput: {
+    backgroundColor: theme.colors.background,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.sm,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    marginBottom: theme.spacing.md,
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.text,
+  },
+  addVariantButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+    borderRadius: theme.borderRadius.md,
+    gap: theme.spacing.sm,
+  },
+  addVariantButtonText: {
+    fontSize: theme.typography.fontSizes.base,
+    fontWeight: theme.typography.fontWeights.semibold as any,
+    color: theme.colors.primary,
+  },

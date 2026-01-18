@@ -52,6 +52,7 @@ export const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
   const [quantity, setQuantity] = useState(1);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [selectedVariant, setSelectedVariant] = useState<any>(null);
 
   useEffect(() => {
     loadProductById(productId);
@@ -63,6 +64,13 @@ export const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       clearSelectedProduct();
     };
   }, [productId, isAuthenticated, wishlist, wishlistLoading, dispatch, loadProductById, loadProductReviews, clearSelectedProduct]);
+
+  // Set default variant when product loads
+  useEffect(() => {
+    if (selectedProduct?.variants && selectedProduct.variants.length > 0) {
+      setSelectedVariant(selectedProduct.variants[0]);
+    }
+  }, [selectedProduct]);
 
   // Refetch reviews and hydrate wishlist when screen regains focus
   useFocusEffect(
@@ -115,19 +123,30 @@ export const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   }
 
   const product = selectedProduct;
-  const discountPercentage = product.discountPrice
-    ? Math.round(((parseFloat(product.price) - parseFloat(product.discountPrice)) / parseFloat(product.price)) * 100)
-    : 0;
+  
+  // Calculate price with variant override
+  const getVariantPrice = () => {
+    if (selectedVariant?.price) return parseFloat(selectedVariant.price);
+    if (selectedVariant?.discountPrice) return parseFloat(selectedVariant.discountPrice);
+    if (product.discountPrice) return parseFloat(product.discountPrice);
+    return parseFloat(product.price);
+  };
 
-  const displayPrice = product.discountPrice
-    ? parseFloat(product.discountPrice)
-    : parseFloat(product.price);
-  const originalPrice = parseFloat(product.price);
+  const getOriginalPrice = () => {
+    if (selectedVariant?.price) return parseFloat(selectedVariant.price);
+    return parseFloat(product.price);
+  };
+
+  const displayPrice = getVariantPrice();
+  const originalPrice = getOriginalPrice();
+  const discountPercentage = selectedVariant?.discountPrice || product.discountPrice
+    ? Math.round(((originalPrice - displayPrice) / originalPrice) * 100)
+    : 0;
   const totalPrice = (displayPrice * quantity).toFixed(2);
 
   const handleAddToCart = async () => {
     try {
-      const result = await dispatch(addToCart({ productId, quantity })).unwrap();
+      const result = await dispatch(addToCart({ productId, quantity, variantId: selectedVariant?.id })).unwrap();
       
       Alert.alert(
         'Success',
@@ -165,7 +184,8 @@ export const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   };
 
   const handleQuantityIncrease = () => {
-    if (quantity < product.stockQuantity) {
+    const availableStock = selectedVariant?.stockQuantity ?? product.stockQuantity;
+    if (quantity < availableStock) {
       setQuantity(quantity + 1);
     }
   };
@@ -297,6 +317,72 @@ export const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             </Text>
           </TouchableOpacity>
 
+          {/* Variant Selector */}
+          {product.variants && product.variants.length > 0 && (
+            <View style={styles.variantSection}>
+              <Text style={styles.sectionTitle}>Select Variant</Text>
+              <View style={styles.variantOptions}>
+                {product.variants.map((variant) => {
+                  const isSelected = selectedVariant?.id === variant.id;
+                  const isOutOfStock = variant.stockQuantity === 0;
+                  const isLowStock = variant.stockQuantity > 0 && variant.stockQuantity <= variant.lowStockThreshold;
+                  
+                  return (
+                    <TouchableOpacity
+                      key={variant.id}
+                      style={[
+                        styles.variantOption,
+                        isSelected && styles.variantOptionSelected,
+                        isOutOfStock && styles.variantOptionDisabled,
+                      ]}
+                      onPress={() => !isOutOfStock && setSelectedVariant(variant)}
+                      disabled={isOutOfStock}
+                      activeOpacity={isOutOfStock ? 1 : 0.7}
+                    >
+                      <Text style={[
+                        styles.variantOptionText,
+                        isSelected && styles.variantOptionTextSelected,
+                      ]}>
+                        {variant.name}
+                      </Text>
+                      {variant.price && variant.price !== product.price && (
+                        <Text style={[
+                          styles.variantOptionPrice,
+                          isSelected && styles.variantOptionPriceSelected,
+                        ]}>
+                          ₹{parseFloat(variant.price).toFixed(2)}
+                        </Text>
+                      )}
+                      {isOutOfStock && (
+                        <View style={styles.outOfStockBadge}>
+                          <Text style={styles.outOfStockText}>Out of Stock</Text>
+                        </View>
+                      )}
+                      {isLowStock && !isOutOfStock && (
+                        <View style={styles.lowStockBadge}>
+                          <Text style={styles.lowStockText}>Only {variant.stockQuantity} left</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Variant Attributes */}
+              {selectedVariant && Object.keys(selectedVariant.attributes || {}).length > 0 && (
+                <View style={styles.variantAttributes}>
+                  <Text style={styles.variantAttributeTitle}>Specifications</Text>
+                  {Object.entries(selectedVariant.attributes).map(([key, value]) => (
+                    <View key={key} style={styles.variantAttributeRow}>
+                      <Text style={styles.variantAttributeLabel}>{key}:</Text>
+                      <Text style={styles.variantAttributeValue}>{value}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+          )}
+
           {/* Description */}
           <View style={styles.descriptionSection}>
             <Text style={styles.sectionTitle}>Description</Text>
@@ -323,21 +409,21 @@ export const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                   styles.detailValue,
                   {
                     color:
-                      product.stockQuantity > 0
+                      (selectedVariant?.stockQuantity ?? product.stockQuantity) > 0
                         ? theme.colors.success
                         : theme.colors.error,
                   },
                 ]}
               >
-                {product.stockQuantity > 0
-                  ? `${product.stockQuantity} Available`
+                {(selectedVariant?.stockQuantity ?? product.stockQuantity) > 0
+                  ? `${selectedVariant?.stockQuantity ?? product.stockQuantity} Available`
                   : 'Out of Stock'}
               </Text>
             </View>
           </View>
 
           {/* Quantity Selector */}
-          {product.stockQuantity > 0 && (
+          {(selectedVariant?.stockQuantity ?? product.stockQuantity) > 0 && (
             <View style={styles.quantitySection}>
               <Text style={styles.sectionTitle}>Quantity</Text>
               <View style={styles.quantitySelector}>
@@ -371,9 +457,9 @@ export const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           {/* Add to Cart Button */}
           {product.stockQuantity > 0 ? (
             <Button
-              title={addingToCart ? 'Adding to Cart...' : `Add ${quantity} to Cart`}
+              title={addingToCart.action ? 'Adding to Cart...' : `Add ${quantity} to Cart`}
               onPress={handleAddToCart}
-              disabled={addingToCart}
+              disabled={addingToCart.action}
               style={styles.addButton}
             />
           ) : (
@@ -866,4 +952,107 @@ const styles = StyleSheet.create({
   writeReviewButton: {
     marginTop: theme.spacing.md,
   },
-});
+  variantSection: {
+    marginVertical: 16,
+    paddingHorizontal: 16,
+  },
+  variantOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 16,
+  },
+  variantOption: {
+    flex: 1,
+    minWidth: '45%',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderWidth: 1.5,
+    borderColor: theme.colors.border,
+    borderRadius: 8,
+    backgroundColor: theme.colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  variantOptionSelected: {
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.primaryLight,
+  },
+  variantOptionDisabled: {
+    opacity: 0.5,
+  },
+  variantOptionText: {
+    fontSize: theme.typography.fontSizes.sm,
+    fontWeight: theme.typography.fontWeights.semibold as '600',
+    color: theme.colors.text,
+    textAlign: 'center',
+  },
+  variantOptionTextSelected: {
+    color: theme.colors.primary,
+  },
+  variantOptionPrice: {
+    fontSize: theme.typography.fontSizes.xs,
+    color: theme.colors.textLight,
+    marginTop: 4,
+  },
+  variantOptionPriceSelected: {
+    color: theme.colors.primary,
+  },
+  outOfStockBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: theme.colors.error,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  outOfStockText: {
+    fontSize: theme.typography.fontSizes.xs,
+    color: theme.colors.white,
+    fontWeight: theme.typography.fontWeights.semibold as '600',
+  },
+  lowStockBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: theme.colors.warning,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  lowStockText: {
+    fontSize: theme.typography.fontSizes.xs,
+    color: theme.colors.white,
+    fontWeight: theme.typography.fontWeights.semibold as '600',
+  },
+  variantAttributes: {
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: theme.colors.surface,
+    borderRadius: 8,
+  },
+  variantAttributeTitle: {
+    fontSize: theme.typography.fontSizes.sm,
+    fontWeight: theme.typography.fontWeights.semibold as '600',
+    color: theme.colors.text,
+    marginBottom: 8,
+  },
+  variantAttributeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+    borderBottomWidth: 0.5,
+    borderBottomColor: theme.colors.border,
+  },
+  variantAttributeLabel: {
+    fontSize: theme.typography.fontSizes.xs,
+    color: theme.colors.textLight,
+    fontWeight: theme.typography.fontWeights.semibold as '600',
+  },
+  variantAttributeValue: {
+    fontSize: theme.typography.fontSizes.xs,
+    color: theme.colors.text,
+  },

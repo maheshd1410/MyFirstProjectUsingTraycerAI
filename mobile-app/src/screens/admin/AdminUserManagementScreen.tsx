@@ -7,7 +7,10 @@ import {
   Text,
   ActivityIndicator,
   TextInput,
+  RefreshControl,
+  Alert,
 } from 'react-native';
+import { useNetInfo } from '@react-native-community/netinfo';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
@@ -27,12 +30,24 @@ export const AdminUserManagementScreen: React.FC<AdminUserManagementScreenProps>
   const dispatch = useAppDispatch();
   const users = useAppSelector(selectAdminUsers);
   const loading = useAppSelector(selectAdminLoading);
+  const { isConnected } = useNetInfo();
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredUsers, setFilteredUsers] = useState(users);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     dispatch(fetchAdminUsers({ page: 1, pageSize: 20 }) as any);
   }, [dispatch]);
+
+  const handleRefresh = async () => {
+    if (!isConnected) {
+      Alert.alert('Offline', 'You are currently offline. Pull-to-refresh requires an internet connection.');
+      return;
+    }
+    setRefreshing(true);
+    await dispatch(fetchAdminUsers({ page: 1, pageSize: 20 }) as any).unwrap().catch(() => {});
+    setRefreshing(false);
+  };
 
   useEffect(() => {
     if (searchQuery.trim()) {
@@ -103,7 +118,7 @@ export const AdminUserManagementScreen: React.FC<AdminUserManagementScreenProps>
         ) : null}
       </View>
 
-      {loading && !filteredUsers.length ? (
+      {loading.fetch && !filteredUsers.length ? (
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
         </View>
@@ -113,6 +128,13 @@ export const AdminUserManagementScreen: React.FC<AdminUserManagementScreenProps>
           renderItem={renderUserItem}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={theme.colors.primary}
+            />
+          }
           ListEmptyComponent={
             <View style={styles.centerContainer}>
               <Ionicons name="people-outline" size={48} color={theme.colors.textLight} />

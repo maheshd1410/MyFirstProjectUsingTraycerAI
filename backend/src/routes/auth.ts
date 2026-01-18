@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import * as authController from '../controllers/auth.controller';
+import { oauthController } from '../controllers/oauth.controller';
 import { authenticate } from '../middleware/auth';
 import { validateRegister, validateLogin, validate } from '../middleware/validators/auth.validator';
 import { csrfProtection } from '../middleware/csrf';
@@ -224,5 +225,128 @@ router.put('/fcm-token', csrfProtection, authenticate, authController.updateFcmT
  *               $ref: '#/components/schemas/Error'
  */
 router.delete('/fcm-token', csrfProtection, authenticate, authController.removeFcmToken);
+
+/**
+ * @swagger
+ * /api/auth/google:
+ *   get:
+ *     summary: Initiate Google OAuth login
+ *     tags: [Authentication]
+ *     description: Redirects to Google OAuth consent screen
+ *     responses:
+ *       302:
+ *         description: Redirect to Google OAuth
+ */
+router.get('/google', oauthController.googleAuth);
+
+/**
+ * @swagger
+ * /api/auth/google/callback:
+ *   get:
+ *     summary: Google OAuth callback
+ *     tags: [Authentication]
+ *     description: Handles Google OAuth callback and redirects to mobile app with tokens
+ *     parameters:
+ *       - in: query
+ *         name: code
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: Authorization code from Google
+ *     responses:
+ *       302:
+ *         description: Redirect to mobile app with tokens or error
+ */
+router.get('/google/callback', oauthController.googleCallback);
+
+/**
+ * @swagger
+ * /api/auth/apple:
+ *   get:
+ *     summary: Initiate Apple OAuth login
+ *     tags: [Authentication]
+ *     description: Redirects to Apple OAuth consent screen
+ *     responses:
+ *       302:
+ *         description: Redirect to Apple OAuth
+ */
+router.get('/apple', oauthController.appleAuth);
+
+/**
+ * @swagger
+ * /api/auth/apple/callback:
+ *   get:
+ *     summary: Apple OAuth callback
+ *     tags: [Authentication]
+ *     description: Handles Apple OAuth callback and redirects to mobile app with tokens
+ *     parameters:
+ *       - in: query
+ *         name: code
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: Authorization code from Apple
+ *     responses:
+ *       302:
+ *         description: Redirect to mobile app with tokens or error
+ */
+router.get('/apple/callback', oauthController.appleCallback);
+
+/**
+ * @swagger
+ * /api/auth/oauth/link:
+ *   post:
+ *     summary: Link OAuth account to existing user
+ *     tags: [Authentication]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - provider
+ *               - accessToken
+ *             properties:
+ *               provider:
+ *                 type: string
+ *                 enum: [google, apple]
+ *               accessToken:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: OAuth account linked successfully
+ *       400:
+ *         description: Invalid request
+ *       409:
+ *         description: Account already linked
+ */
+router.post('/oauth/link', authenticate, csrfProtection, oauthController.linkOAuthAccount);
+
+/**
+ * @swagger
+ * /api/auth/oauth/unlink/{provider}:
+ *   delete:
+ *     summary: Unlink OAuth account from user
+ *     tags: [Authentication]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: provider
+ *         schema:
+ *           type: string
+ *           enum: [google, apple]
+ *         required: true
+ *         description: OAuth provider to unlink
+ *     responses:
+ *       200:
+ *         description: OAuth account unlinked successfully
+ *       400:
+ *         description: Invalid request or cannot unlink (need at least one auth method)
+ */
+router.delete('/oauth/unlink/:provider', authenticate, csrfProtection, oauthController.unlinkOAuthAccount);
 
 export default router;

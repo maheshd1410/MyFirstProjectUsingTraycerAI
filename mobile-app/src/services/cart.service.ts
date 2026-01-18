@@ -26,6 +26,7 @@ export interface Cart {
 export interface AddToCartRequest {
   productId: string;
   quantity: number;
+  variantId?: string;
 }
 
 export interface UpdateCartItemRequest {
@@ -43,10 +44,11 @@ export const getCart = async (): Promise<Cart> => {
 /**
  * Add item to cart
  */
-export const addToCart = async (productId: string, quantity: number): Promise<Cart> => {
+export const addToCart = async (productId: string, quantity: number, variantId?: string): Promise<Cart> => {
   const response = await api.post('/cart/items', {
     productId,
     quantity,
+    variantId,
   } as AddToCartRequest);
   return response.data;
 };

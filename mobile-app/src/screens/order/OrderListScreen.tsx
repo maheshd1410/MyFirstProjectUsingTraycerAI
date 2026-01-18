@@ -9,6 +9,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
@@ -21,7 +22,9 @@ import {
 } from '../../store/order/orderSlice';
 import { Order, OrderStatus } from '../../types';
 import { theme } from '../../theme';
-import { Button, OrderStatusBadge, OrderCardSkeleton } from '../../components';
+import { Button, OrderStatusBadge, OrderCardSkeleton, OfflineBanner } from '../../components';
+import { useNetworkStatus } from '../../utils/network';
+import { formatErrorForDisplay } from '../../utils/errorMessages';
 
 interface OrderListScreenProps {
   navigation: any;
@@ -39,6 +42,7 @@ const ORDER_STATUSES: OrderStatus[] = [
 
 export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation }) => {
   const dispatch = useAppDispatch();
+  const { isConnected } = useNetworkStatus();
   const orders = useAppSelector(selectOrders);
   const loading = useAppSelector(selectOrderLoading);
   const error = useAppSelector(selectOrderError);
@@ -52,6 +56,10 @@ export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation }) 
   }, [dispatch]);
 
   const handleRefresh = () => {
+    if (!isConnected) {
+      Alert.alert('Offline', 'Cannot refresh while offline. Showing cached orders.');
+      return;
+    }
     setRefreshing(true);
     dispatch(fetchOrders()).then(() => {
       setRefreshing(false);
@@ -73,6 +81,10 @@ export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation }) 
 
   const handleStatusFilter = (status: OrderStatus | 'All') => {
     setSelectedStatus(status);
+    if (!isConnected) {
+      Alert.alert('Offline', 'Filtering offline orders locally');
+      return;
+    }
     dispatch(
       fetchOrders({
         page: 1,
@@ -86,6 +98,10 @@ export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation }) 
   };
 
   const handleRetry = () => {
+    if (!isConnected) {
+      Alert.alert('Offline', 'Cannot retry while offline');
+      return;
+    }
     dispatch(clearError());
     dispatch(fetchOrders() as any);
   };
@@ -163,12 +179,14 @@ export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation }) 
   if (error) {
     return (
       <View style={styles.container}>
+        <OfflineBanner />
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
+          <Text style={styles.errorText}>{formatErrorForDisplay(error)}</Text>
           <Button
             title="Retry"
             onPress={handleRetry}
             style={styles.retryButton}
+            disabled={!isConnected}
           />
         </View>
       </View>
@@ -177,6 +195,14 @@ export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation }) 
 
   return (
     <View style={styles.container}>
+      <OfflineBanner />
+      {!isConnected && orders.length > 0 && (
+        <View style={styles.cacheNotice}>
+          <Text style={styles.cacheNoticeText}>
+            📦 Viewing cached orders (offline mode)
+          </Text>
+        </View>
+      )}
       {renderStatusFilter()}
 
       {loading && orders.length === 0 ? (
@@ -363,5 +389,17 @@ const styles = StyleSheet.create({
   },
   footerLoader: {
     paddingVertical: theme.spacing.lg,
+  },
+  cacheNotice: {
+    backgroundColor: theme.colors.info + '20',
+    padding: theme.spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.info,
+  },
+  cacheNoticeText: {
+    color: theme.colors.info,
+    fontSize: theme.typography.fontSizes.sm,
+    textAlign: 'center',
+    fontWeight: theme.typography.fontWeights.medium as '500',
   },
 });

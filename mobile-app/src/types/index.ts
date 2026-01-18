@@ -1,6 +1,22 @@
 // User and Auth Types
 export type UserRole = 'CUSTOMER' | 'ADMIN';
 
+// Loading State Types
+export interface LoadingState {
+  fetch: boolean;
+  refresh: boolean;
+  loadMore: boolean;
+  action: boolean;
+  upload: boolean;
+}
+
+export interface OptimisticUpdate<T> {
+  id: string;
+  type: 'add' | 'update' | 'remove';
+  data: T;
+  timestamp: number;
+}
+
 // Re-export admin types
 export {
   type AdminAnalytics,
@@ -51,6 +67,7 @@ export interface AuthResponse {
   user: User;
   accessToken: string;
   refreshToken: string;
+  isNewUser?: boolean;
 }
 
 // Profile Types
@@ -78,6 +95,22 @@ export interface Category {
   updatedAt: string;
 }
 
+export interface ProductVariant {
+  id: string;
+  productId: string;
+  sku: string;
+  name: string;
+  attributes: Record<string, string>;
+  price?: string;
+  discountPrice?: string;
+  stockQuantity: number;
+  lowStockThreshold: number;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -95,6 +128,7 @@ export interface Product {
   isFeatured: boolean;
   averageRating: number;
   totalReviews: number;
+  variants?: ProductVariant[];
   createdAt: string;
   updatedAt: string;
 }
@@ -115,7 +149,7 @@ export interface ProductState {
   products: Product[];
   selectedProduct: Product | null;
   categories: Category[];
-  loading: boolean;
+  loading: LoadingState;
   error: string | null;
   filters: ProductFilterParams;
   pagination: {
@@ -134,6 +168,9 @@ export interface CartItem {
   discountPrice?: string;
   quantity: number;
   subtotal: string;
+  variantId?: string;
+  variantName?: string;
+  variantAttributes?: Record<string, string>;
   createdAt: string;
 }
 
@@ -149,8 +186,9 @@ export interface Cart {
 
 export interface CartState {
   cart: Cart | null;
-  loading: boolean;
+  loading: LoadingState;
   error: string | null;
+  optimisticUpdates: OptimisticUpdate<CartItem>[];
 }
 
 // Wishlist Types
@@ -168,8 +206,9 @@ export interface Wishlist {
 
 export interface WishlistState {
   wishlist: Wishlist | null;
-  loading: boolean;
+  loading: LoadingState;
   error: string | null;
+  optimisticUpdates: OptimisticUpdate<WishlistItem>[];
 }
 
 // Address Types
@@ -219,6 +258,32 @@ export interface AddressState {
   error: string | null;
 }
 
+// Coupon Types
+export type CouponDiscountType = 'PERCENTAGE' | 'FIXED_AMOUNT' | 'FREE_SHIPPING';
+
+export interface Coupon {
+  id: string;
+  code: string;
+  name: string;
+  discountType: CouponDiscountType;
+  discountValue: string;
+  minOrderAmount?: string;
+  maxDiscountAmount?: string;
+  validFrom: string;
+  validUntil: string;
+  isActive: boolean;
+}
+
+export interface CouponValidationResult {
+  isValid: boolean;
+  discountAmount: number;
+  finalAmount: number;
+  message?: string;
+  isFreeShipping?: boolean;
+  couponId?: string;
+  coupon?: Coupon;
+}
+
 // Order Types
 export type OrderStatus =
   | 'PENDING'
@@ -241,6 +306,10 @@ export interface OrderItem {
   quantity: number;
   unitPrice: string;
   totalPrice: string;
+  variantId?: string;
+  variantSku?: string;
+  variantName?: string;
+  variantAttributes?: Record<string, string>;
 }
 
 export interface Order {
@@ -254,6 +323,9 @@ export interface Order {
   taxAmount: string;
   deliveryCharge: string;
   discountAmount: string;
+  couponDiscount: string;
+  couponCode: string | null;
+  couponId: string | null;
   totalAmount: string;
   specialInstructions: string | null;
   estimatedDeliveryDate: string | null;
@@ -270,6 +342,7 @@ export interface CreateOrderRequest {
   addressId: string;
   paymentMethod: PaymentMethod;
   specialInstructions?: string;
+  couponCode?: string;
 }
 
 export interface CancelOrderRequest {
@@ -297,7 +370,7 @@ export type PaginatedOrders = {
 export interface OrderState {
   orders: Order[];
   selectedOrder: Order | null;
-  loading: boolean;
+  loading: LoadingState;
   error: string | null;
   pagination: OrderPagination;
 }
@@ -452,7 +525,24 @@ export interface ReviewPagination {
 export interface ReviewState {
   reviews: Review[];
   userReviews: Review[];
-  loading: boolean;
+  loading: LoadingState;
   error: string | null;
   pagination: ReviewPagination;
+}
+
+// Network and Offline Types
+export interface NetworkState {
+  isConnected: boolean;
+  isInternetReachable: boolean | null;
+  connectionType: string | null;
+  lastOnlineTime: number | null;
+}
+
+export interface OfflineAction {
+  id: string;
+  type: string;
+  payload: any;
+  timestamp: number;
+  retryCount: number;
+  priority?: 'high' | 'medium' | 'low';
 }

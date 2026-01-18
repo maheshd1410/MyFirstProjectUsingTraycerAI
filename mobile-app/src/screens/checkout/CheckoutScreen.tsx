@@ -6,15 +6,19 @@ import {
   Text,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { selectCartItems, selectCartTotal } from '../../store/cart/cartSlice';
 import { selectAddresses, selectDefaultAddress, fetchAddresses } from '../../store/address/addressSlice';
 import { createOrder } from '../../store/order/orderSlice';
-import { Address, PaymentMethod } from '../../types';
+import { Address, PaymentMethod, CouponValidationResult } from '../../types';
 import { theme } from '../../theme';
-import { Button } from '../../components';
+import { Button, OfflineBanner } from '../../components';
 import { Input } from '../../components/Input';
+import { useNetworkStatus } from '../../utils/network';
+import { formatErrorForDisplay } from '../../utils/errorMessages';
+import { couponService } from '../../services/coupon.service';
 
 interface CheckoutScreenProps {
   navigation: any;
@@ -23,6 +27,7 @@ interface CheckoutScreenProps {
 
 export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ navigation, route }) => {
   const dispatch = useAppDispatch();
+  const { isConnected } = useNetworkStatus();
   const cartItems = useAppSelector(selectCartItems);
   const cartTotal = useAppSelector(selectCartTotal);
   const addresses = useAppSelector(selectAddresses);
@@ -33,6 +38,12 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ navigation, rout
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Coupon state
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<CouponValidationResult | null>(null);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponError, setCouponError] = useState<string | null>(null);
 
   // Fetch addresses on mount
   useEffect(() => {
@@ -50,11 +61,54 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ navigation, rout
   // Calculate amounts
   const subtotal = parseFloat(cartTotal);
   const taxAmount = subtotal * 0.05; // 5% tax
-  const deliveryCharge = 50; // ₹50 delivery
-  const totalAmount = subtotal + taxAmount + deliveryCharge;
+  const couponDiscount = appliedCoupon?.discountAmount || 0;
+  const isFreeShipping = appliedCoupon?.isFreeShipping || false;
+  const deliveryCharge = isFreeShipping ? 0 : 50; // ₹50 delivery or free with shipping coupon
+  const totalAmount = subtotal + taxAmount + deliveryCharge - couponDiscount;
 
   const handleChangeAddress = () => {
     navigation.navigate('AddressList');
+  };
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) {
+      setCouponError('Please enter a coupon code');
+      return;
+    }
+
+    setCouponLoading(true);
+    setCouponError(null);
+
+    try {
+      // Extract product IDs from cart items
+      const productIds = cartItems.map((item) => item.productId);
+
+      const result = await couponService.validateCoupon({
+        couponCode: couponCode.trim().toUpperCase(),
+        cartTotal: subtotal,
+        productIds,
+      });
+
+      if (result.isValid) {
+        setAppliedCoupon(result);
+        setCouponError(null);
+        Alert.alert('Success', result.message || 'Coupon applied successfully!');
+      } else {
+        setCouponError(result.message || 'Invalid coupon code');
+        setAppliedCoupon(null);
+      }
+    } catch (err: any) {
+      setCouponError(formatErrorForDisplay(err.response?.data?.message || err.message) || 'Failed to apply coupon');
+      setAppliedCoupon(null);
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCode('');
+    setCouponError(null);
   };
 
   const handlePlaceOrder = async () => {
@@ -71,6 +125,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ navigation, rout
         addressId: selectedAddress.id,
         paymentMethod,
         specialInstructions: specialInstructions || undefined,
+        couponCode: appliedCoupon ? couponCode.trim().toUpperCase() : undefined,
       };
 
       const result = await dispatch(createOrder(orderData) as any);
@@ -85,10 +140,10 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ navigation, rout
           navigation.navigate('OrderConfirmation', { orderId });
         }
       } else {
-        setError(result.payload || 'Failed to create order');
+        setError(formatErrorForDisplay(result.payload) || 'Failed to create order');
       }
     } catch (err: any) {
-      setError(err.message || 'An error occurred');
+      setError(formatErrorForDisplay(err.message) || 'An error occurred');
     } finally {
       setLoading(false);
     }
@@ -98,6 +153,17 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ navigation, rout
 
   return (
     <ScrollView style={styles.container}>
+      <OfflineBanner />
+      
+      {!isConnected && (
+        <View style={styles.offlineWarning}>
+          <Text style={styles.offlineWarningTitle}>🔌 No Internet Connection</Text>
+          <Text style={styles.offlineWarningText}>
+            Checkout requires an active internet connection. Please connect to Wi-Fi or mobile data to continue.
+          </Text>
+        </View>
+      )}
+
       {/* Order Summary */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Order Summary</Text>
@@ -123,9 +189,18 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ navigation, rout
           <Text style={styles.priceValue}>₹{taxAmount.toFixed(2)}</Text>
         </View>
 
+        {couponDiscount > 0 && (
+          <View style={styles.priceRow}>
+            <Text style={styles.discountLabel}>Coupon Discount</Text>
+            <Text style={styles.discountValue}>-₹{couponDiscount.toFixed(2)}</Text>
+          </View>
+        )}
+
         <View style={styles.priceRow}>
           <Text style={styles.priceLabel}>Delivery Charge</Text>
-          <Text style={styles.priceValue}>₹{deliveryCharge.toFixed(2)}</Text>
+          <Text style={styles.priceValue}>
+            {isFreeShipping ? 'FREE' : `₹${deliveryCharge.toFixed(2)}`}
+          </Text>
         </View>
 
         <View style={styles.divider} />
@@ -134,6 +209,54 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ navigation, rout
           <Text style={styles.totalLabel}>Total Amount</Text>
           <Text style={styles.totalValue}>₹{totalAmount.toFixed(2)}</Text>
         </View>
+      </View>
+
+      {/* Coupon Code Section */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Have a Coupon?</Text>
+        
+        {appliedCoupon ? (
+          <View style={styles.appliedCouponCard}>
+            <View style={styles.appliedCouponHeader}>
+              <Text style={styles.appliedCouponCode}>{couponCode.toUpperCase()}</Text>
+              <TouchableOpacity onPress={handleRemoveCoupon}>
+                <Text style={styles.removeCouponText}>Remove</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.appliedCouponMessage}>
+              {appliedCoupon.message || 'Coupon applied successfully!'}
+            </Text>
+            <Text style={styles.savingsText}>
+              You saved ₹{couponDiscount.toFixed(2)}
+              {isFreeShipping && ' + FREE Shipping'}
+            </Text>
+          </View>
+        ) : (
+          <>
+            <View style={styles.couponInputRow}>
+              <Input
+                placeholder="Enter coupon code"
+                value={couponCode}
+                onChangeText={(text) => {
+                  setCouponCode(text);
+                  setCouponError(null);
+                }}
+                style={styles.couponInput}
+                autoCapitalize="characters"
+                editable={!couponLoading}
+              />
+              <Button
+                title={couponLoading ? 'Applying...' : 'Apply'}
+                onPress={handleApplyCoupon}
+                disabled={couponLoading || !couponCode.trim()}
+                style={styles.applyCouponButton}
+              />
+            </View>
+            {couponError && (
+              <Text style={styles.couponErrorText}>{couponError}</Text>
+            )}
+          </>
+        )}
       </View>
 
       {/* Delivery Address */}
@@ -209,8 +332,17 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ navigation, rout
       <View style={styles.buttonContainer}>
         <Button
           title={loading ? 'Processing...' : 'Place Order'}
-          onPress={handlePlaceOrder}
-          disabled={loading || !selectedAddress}
+          onPress={() => {
+            if (!isConnected) {
+              Alert.alert(
+                'No Internet Connection',
+                'Please connect to the internet to place your order.'
+              );
+              return;
+            }
+            handlePlaceOrder();
+          }}
+          disabled={loading || !selectedAddress || !isConnected}
         />
       </View>
     </ScrollView>
@@ -355,5 +487,85 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     marginBottom: theme.spacing.xl,
+  },
+  offlineWarning: {
+    backgroundColor: theme.colors.warning + '30',
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.lg,
+    marginBottom: theme.spacing.lg,
+    borderWidth: 2,
+    borderColor: theme.colors.warning,
+  },
+  offlineWarningTitle: {
+    fontSize: theme.typography.fontSizes.lg,
+    fontWeight: theme.typography.fontWeights.bold as '700',
+    color: theme.colors.warning,
+    marginBottom: theme.spacing.sm,
+    textAlign: 'center',
+  },
+  offlineWarningText: {
+    fontSize: theme.typography.fontSizes.base,
+    color: theme.colors.text,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  discountLabel: {
+    fontSize: theme.typography.fontSizes.base,
+    color: theme.colors.success,
+  },
+  discountValue: {
+    fontSize: theme.typography.fontSizes.base,
+    color: theme.colors.success,
+    fontWeight: theme.typography.fontWeights.semibold as '600',
+  },
+  couponInputRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: theme.spacing.sm,
+  },
+  couponInput: {
+    flex: 1,
+  },
+  applyCouponButton: {
+    minWidth: 100,
+    paddingHorizontal: theme.spacing.md,
+  },
+  couponErrorText: {
+    color: theme.colors.error,
+    fontSize: theme.typography.fontSizes.sm,
+    marginTop: theme.spacing.sm,
+  },
+  appliedCouponCard: {
+    backgroundColor: `${theme.colors.success}15`,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.colors.success,
+  },
+  appliedCouponHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: theme.spacing.sm,
+  },
+  appliedCouponCode: {
+    fontSize: theme.typography.fontSizes.lg,
+    fontWeight: theme.typography.fontWeights.bold as '700',
+    color: theme.colors.success,
+  },
+  removeCouponText: {
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.error,
+    fontWeight: theme.typography.fontWeights.semibold as '600',
+  },
+  appliedCouponMessage: {
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.xs,
+  },
+  savingsText: {
+    fontSize: theme.typography.fontSizes.base,
+    fontWeight: theme.typography.fontWeights.semibold as '600',
+    color: theme.colors.success,
   },
 });

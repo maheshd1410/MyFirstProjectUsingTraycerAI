@@ -15,7 +15,13 @@ const initialState: AdminState = {
   orders: [],
   users: [],
   selectedUser: null,
-  loading: false,
+  loading: {
+    fetch: false,
+    refresh: false,
+    loadMore: false,
+    action: false,
+    upload: false,
+  },
   error: null,
   orderPagination: null,
   userPagination: null,
@@ -66,73 +72,73 @@ const adminSlice = createSlice({
     // fetchAnalytics
     builder
       .addCase(fetchAnalytics.pending, (state) => {
-        state.loading = true;
+        state.loading.fetch = true;
         state.error = null;
       })
       .addCase(fetchAnalytics.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loading.fetch = false;
         state.analytics = action.payload;
       })
       .addCase(fetchAnalytics.rejected, (state, action) => {
-        state.loading = false;
+        state.loading.fetch = false;
         state.error = action.error.message || 'Failed to fetch analytics';
       });
 
     // fetchAllOrders
     builder
       .addCase(fetchAllOrders.pending, (state) => {
-        state.loading = true;
+        state.loading.fetch = true;
         state.error = null;
       })
       .addCase(fetchAllOrders.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loading.fetch = false;
         state.orders = action.payload.data;
         state.orderPagination = action.payload.pagination;
       })
       .addCase(fetchAllOrders.rejected, (state, action) => {
-        state.loading = false;
+        state.loading.fetch = false;
         state.error = action.error.message || 'Failed to fetch orders';
       });
 
     // fetchAllUsers
     builder
       .addCase(fetchAllUsers.pending, (state) => {
-        state.loading = true;
+        state.loading.fetch = true;
         state.error = null;
       })
       .addCase(fetchAllUsers.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loading.fetch = false;
         state.users = action.payload.data;
         state.userPagination = action.payload.pagination;
       })
       .addCase(fetchAllUsers.rejected, (state, action) => {
-        state.loading = false;
+        state.loading.fetch = false;
         state.error = action.error.message || 'Failed to fetch users';
       });
 
     // fetchUserById
     builder
       .addCase(fetchUserById.pending, (state) => {
-        state.loading = true;
+        state.loading.fetch = true;
         state.error = null;
       })
       .addCase(fetchUserById.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loading.fetch = false;
         state.selectedUser = action.payload;
       })
       .addCase(fetchUserById.rejected, (state, action) => {
-        state.loading = false;
+        state.loading.fetch = false;
         state.error = action.error.message || 'Failed to fetch user';
       });
 
     // updateUserStatus
     builder
       .addCase(updateUserStatus.pending, (state) => {
-        state.loading = true;
+        state.loading.action = true;
         state.error = null;
       })
       .addCase(updateUserStatus.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loading.action = false;
         const updatedUser = action.payload;
         const userIndex = state.users.findIndex((u) => u.id === updatedUser.id);
         if (userIndex >= 0) {
@@ -143,7 +149,7 @@ const adminSlice = createSlice({
         }
       })
       .addCase(updateUserStatus.rejected, (state, action) => {
-        state.loading = false;
+        state.loading.action = false;
         state.error = action.error.message || 'Failed to update user status';
       });
   },

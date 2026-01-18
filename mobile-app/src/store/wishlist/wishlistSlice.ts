@@ -5,8 +5,15 @@ import { logoutUser } from '../auth/authSlice';
 
 const initialState: WishlistState = {
   wishlist: null,
-  loading: false,
+  loading: {
+    fetch: false,
+    refresh: false,
+    loadMore: false,
+    action: false,
+    upload: false,
+  },
   error: null,
+  optimisticUpdates: [],
 };
 
 export const fetchWishlist = createAsyncThunk(
@@ -66,64 +73,115 @@ const wishlistSlice = createSlice({
     },
     resetWishlist: (state) => {
       state.wishlist = null;
-      state.loading = false;
+      state.loading = {
+        fetch: false,
+        refresh: false,
+        loadMore: false,
+        action: false,
+        upload: false,
+      };
       state.error = null;
+      state.optimisticUpdates = [];
     },
   },
   extraReducers: (builder) => {
     builder
       .addCase(fetchWishlist.pending, (state) => {
-        state.loading = true;
+        state.loading.fetch = true;
         state.error = null;
       })
       .addCase(fetchWishlist.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loading.fetch = false;
         state.wishlist = action.payload;
       })
       .addCase(fetchWishlist.rejected, (state, action) => {
-        state.loading = false;
+        state.loading.fetch = false;
         state.error = action.payload as string;
       })
-      .addCase(addToWishlistAsync.pending, (state) => {
-        state.loading = true;
+      .addCase(addToWishlistAsync.pending, (state, action) => {
+        state.loading.action = true;
         state.error = null;
+        // Optimistic update - add item immediately
+        const optimisticId = `temp-${Date.now()}`;
+        state.optimisticUpdates.push({
+          id: optimisticId,
+          type: 'add',
+          data: {
+            id: optimisticId,
+            productId: action.meta.arg,
+            product: {} as any, // Will be populated by server
+            createdAt: new Date().toISOString(),
+          },
+          timestamp: Date.now(),
+        });
       })
       .addCase(addToWishlistAsync.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loading.action = false;
         state.wishlist = action.payload;
+        state.optimisticUpdates = [];
       })
       .addCase(addToWishlistAsync.rejected, (state, action) => {
-        state.loading = false;
+        state.loading.action = false;
         state.error = action.payload as string;
+        state.optimisticUpdates = [];
       })
-      .addCase(removeFromWishlistAsync.pending, (state) => {
-        state.loading = true;
+      .addCase(removeFromWishlistAsync.pending, (state, action) => {
+        state.loading.action = true;
         state.error = null;
+        // Optimistic update - remove item immediately
+        if (state.wishlist?.items) {
+          const itemToRemove = state.wishlist.items.find(i => i.productId === action.meta.arg);
+          if (itemToRemove) {
+            state.optimisticUpdates.push({
+              id: action.meta.arg,
+              type: 'remove',
+              data: itemToRemove,
+              timestamp: Date.now(),
+            });
+            state.wishlist.items = state.wishlist.items.filter(i => i.productId !== action.meta.arg);
+          }
+        }
       })
       .addCase(removeFromWishlistAsync.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loading.action = false;
         state.wishlist = action.payload;
+        state.optimisticUpdates = [];
       })
       .addCase(removeFromWishlistAsync.rejected, (state, action) => {
-        state.loading = false;
+        state.loading.action = false;
         state.error = action.payload as string;
+        // Rollback - restore removed item
+        if (state.wishlist?.items && state.optimisticUpdates.length > 0) {
+          const rollback = state.optimisticUpdates[0];
+          if (rollback.type === 'remove' && rollback.data) {
+            state.wishlist.items.push(rollback.data);
+          }
+        }
+        state.optimisticUpdates = [];
       })
       .addCase(clearWishlistAsync.pending, (state) => {
-        state.loading = true;
+        state.loading.action = true;
         state.error = null;
       })
       .addCase(clearWishlistAsync.fulfilled, (state) => {
-        state.loading = false;
+        state.loading.action = false;
         state.wishlist = null;
       })
       .addCase(clearWishlistAsync.rejected, (state, action) => {
-        state.loading = false;
+        state.loading.action = false;
         state.error = action.payload as string;
       })
       .addCase(logoutUser.fulfilled, (state) => {
         state.wishlist = null;
-        state.loading = false;
+        state.loading = {
+          fetch: false,
+          refresh: false,
+          loadMore: false,
+          action: false,
+          upload: false,
+        };
         state.error = null;
+        state.optimisticUpdates = [];
       });
   },
 });

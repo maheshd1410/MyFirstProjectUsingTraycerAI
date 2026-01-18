@@ -1,5 +1,10 @@
 # Ladoo Business — Monorepo
 
+[![Backend CI](https://github.com/username/repo/workflows/Backend%20CI/badge.svg)](https://github.com/username/repo/actions/workflows/backend-ci.yml)
+[![Mobile CI](https://github.com/username/repo/workflows/Mobile%20CI/badge.svg)](https://github.com/username/repo/actions/workflows/mobile-ci.yml)
+[![codecov](https://codecov.io/gh/username/repo/branch/main/graph/badge.svg)](https://codecov.io/gh/username/repo)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 Ladoo Business is a cross-platform e-commerce mobile application (React Native + Expo) and a Node.js + TypeScript backend (Express). This repository is organized as a monorepo with two top-level directories:
 
 - `mobile-app/` — React Native (Expo) mobile application using TypeScript

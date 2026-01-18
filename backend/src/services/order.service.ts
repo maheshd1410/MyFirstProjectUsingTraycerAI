@@ -1,6 +1,7 @@
 import { prisma } from '../config/database';
 import { cartService } from './cart.service';
 import { notificationService } from './notification.service';
+import { couponService } from './coupon.service';
 import { CreateOrderDTO, UpdateOrderStatusDTO, CancelOrderDTO, OrderResponse, OrderItemResponse } from '../types';
 import { Decimal } from '@prisma/client/runtime/library';
 import { emailService } from './email.service';
@@ -35,31 +36,70 @@ export class OrderService {
   /**
    * Calculate order amounts: subtotal, tax, delivery, discount, total
    */
-  private calculateOrderAmounts(cartTotal: Decimal): {
+  private async calculateOrderAmounts(
+    cartTotal: Decimal,
+    couponCode?: string,
+    userId?: string,
+    categoryIds?: string[],
+    productIds?: string[]
+  ): Promise<{
     subtotal: string;
     taxAmount: string;
     deliveryCharge: string;
     discountAmount: string;
+    couponDiscount: string;
     totalAmount: string;
-  } {
+    couponId?: string;
+  }> {
     const subtotal = cartTotal;
     const TAX_RATE = new Decimal('0.05'); // 5% GST
     const FREE_DELIVERY_THRESHOLD = new Decimal('500');
     const DELIVERY_CHARGE = new Decimal('50');
 
-    const taxAmount = subtotal.mul(TAX_RATE);
-    const deliveryCharge = subtotal.greaterThanOrEqualTo(FREE_DELIVERY_THRESHOLD)
+    let couponDiscount = new Decimal('0');
+    let isFreeShipping = false;
+    let couponId: string | undefined;
+
+    // Apply coupon if provided
+    if (couponCode && userId && categoryIds && productIds) {
+      try {
+        const couponResult = await couponService.applyCoupon(
+          couponCode,
+          userId,
+          subtotal,
+          categoryIds,
+          productIds
+        );
+        if (couponResult.isValid) {
+          couponDiscount = new Decimal(couponResult.discountAmount);
+          couponId = couponResult.couponId;
+          isFreeShipping = couponResult.isFreeShipping || false;
+        }
+      } catch (error) {
+        logger.warn('Coupon validation failed during order creation', { couponCode, error });
+        // Don't throw - allow order to proceed without coupon
+      }
+    }
+
+    const subtotalAfterCoupon = subtotal.sub(couponDiscount);
+    const taxAmount = subtotalAfterCoupon.mul(TAX_RATE);
+    
+    // Check for free shipping (from coupon or threshold)
+    let deliveryCharge = isFreeShipping || subtotalAfterCoupon.greaterThanOrEqualTo(FREE_DELIVERY_THRESHOLD)
       ? new Decimal('0')
       : DELIVERY_CHARGE;
-    const discountAmount = new Decimal('0'); // Can be enhanced for promo codes
-    const totalAmount = subtotal.add(taxAmount).add(deliveryCharge).sub(discountAmount);
+
+    const discountAmount = new Decimal('0'); // Keep for future product-level discounts
+    const totalAmount = subtotalAfterCoupon.add(taxAmount).add(deliveryCharge).sub(discountAmount);
 
     return {
       subtotal: subtotal.toString(),
       taxAmount: taxAmount.toString(),
       deliveryCharge: deliveryCharge.toString(),
       discountAmount: discountAmount.toString(),
+      couponDiscount: couponDiscount.toString(),
       totalAmount: totalAmount.toString(),
+      couponId,
     };
   }
 
@@ -81,8 +121,18 @@ export class OrderService {
       throw new Error('Address not found or does not belong to user');
     }
 
-    // Calculate order amounts
-    const amounts = this.calculateOrderAmounts(new Decimal(cart.totalAmount));
+    // Extract unique category and product IDs from cart items
+    const categoryIds = [...new Set(cart.items.map(item => item.productId))];
+    const productIds = cart.items.map(item => item.productId);
+
+    // Calculate order amounts with coupon if provided
+    const amounts = await this.calculateOrderAmounts(
+      new Decimal(cart.totalAmount),
+      data.couponCode,
+      userId,
+      categoryIds,
+      productIds
+    );
 
     // Generate unique order number
     const orderNumber = await this.generateOrderNumber();
@@ -101,6 +151,9 @@ export class OrderService {
           taxAmount: new Decimal(amounts.taxAmount),
           deliveryCharge: new Decimal(amounts.deliveryCharge),
           discountAmount: new Decimal(amounts.discountAmount),
+          couponDiscount: new Decimal(amounts.couponDiscount),
+          couponId: amounts.couponId || null,
+          couponCode: data.couponCode || null,
           totalAmount: new Decimal(amounts.totalAmount),
           specialInstructions: data.specialInstructions || null,
           addressId: data.addressId,
@@ -113,6 +166,20 @@ export class OrderService {
       });
 
       // Create order items from cart
+      const variantIds = cart.items
+        .map(item => item.variantId)
+        .filter((id): id is string => id !== null && id !== undefined);
+      
+      // Fetch variants to get SKU
+      const variants = variantIds.length > 0
+        ? await tx.productVariant.findMany({
+            where: { id: { in: variantIds } },
+            select: { id: true, sku: true },
+          })
+        : [];
+      
+      const variantSkuMap = new Map(variants.map(v => [v.id, v.sku]));
+
       const orderItems = await tx.orderItem.createMany({
         data: cart.items.map((item) => ({
           orderId: newOrder.id,
@@ -122,6 +189,10 @@ export class OrderService {
           quantity: item.quantity,
           unitPrice: new Decimal(item.price),
           totalPrice: new Decimal(item.subtotal),
+          variantId: item.variantId || null,
+          variantSku: item.variantId ? variantSkuMap.get(item.variantId) || null : null,
+          variantName: item.variantName || null,
+          variantAttributes: item.variantAttributes || null,
         })),
       });
 
@@ -150,6 +221,21 @@ export class OrderService {
         logger.info('Order confirmation email queued', { orderId: completeOrder.id });
       } catch (error) {
         logger.error('Failed to queue order confirmation', { orderId: completeOrder.id, error });
+      }
+    }
+
+    // Record coupon usage if coupon was applied
+    if (amounts.couponId && data.couponCode) {
+      try {
+        await couponService.incrementUsageCount(
+          amounts.couponId,
+          userId,
+          order.newOrder.id,
+          new Decimal(amounts.couponDiscount)
+        );
+      } catch (error) {
+        logger.error('Failed to record coupon usage', { couponId: amounts.couponId, error });
+        // Don't throw - order is already created successfully
       }
     }
 
@@ -371,6 +457,9 @@ export class OrderService {
       taxAmount: order.taxAmount.toString(),
       deliveryCharge: order.deliveryCharge.toString(),
       discountAmount: order.discountAmount.toString(),
+      couponDiscount: order.couponDiscount?.toString() || '0',
+      couponCode: order.couponCode,
+      couponId: order.couponId,
       totalAmount: order.totalAmount.toString(),
       specialInstructions: order.specialInstructions,
       estimatedDeliveryDate: order.estimatedDeliveryDate,
@@ -402,6 +491,10 @@ export class OrderService {
         quantity: item.quantity,
         unitPrice: item.unitPrice.toString(),
         totalPrice: item.totalPrice.toString(),
+        variantId: item.variantId,
+        variantSku: item.variantSku,
+        variantName: item.variantName,
+        variantAttributes: item.variantAttributes,
       })),
     };
   }

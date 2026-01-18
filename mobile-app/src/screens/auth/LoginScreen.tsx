@@ -6,13 +6,17 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Platform,
+  Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
-import { useAuth } from '../../hooks';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import { loginWithGoogle, loginWithApple, selectAuthLoading, selectAuthError } from '../../store/auth/authSlice';
 import { Input, Button } from '../../components';
+import { SocialLoginButton } from '../../components/SocialLoginButton';
 import { theme } from '../../theme';
 import { AuthStackParamList } from '../../navigation/AuthNavigator';
 
@@ -29,7 +33,9 @@ const validationSchema = Yup.object().shape({
 
 export const LoginScreen: React.FC = () => {
   const navigation = useNavigation<LoginScreenNavigationProp>();
-  const { login, isLoading, error: authError } = useAuth();
+  const dispatch = useAppDispatch();
+  const isLoading = useAppSelector(selectAuthLoading);
+  const authError = useAppSelector(selectAuthError);
   const [showPassword, setShowPassword] = useState(false);
 
   const formik = useFormik({
@@ -39,16 +45,22 @@ export const LoginScreen: React.FC = () => {
     },
     validationSchema,
     onSubmit: async (values) => {
-      try {
-        await login({
-          email: values.email,
-          password: values.password,
-        }).unwrap();
-      } catch (err) {
-        // Error is handled by Redux and displayed
-      }
+      // Implement email/password login if you have it
+      Alert.alert('Coming Soon', 'Email/password login coming soon');
     },
   });
+
+  const handleGoogleLogin = useCallback(() => {
+    dispatch(loginWithGoogle() as any).catch((error: any) => {
+      Alert.alert('Error', error.message || 'Google login failed');
+    });
+  }, [dispatch]);
+
+  const handleAppleLogin = useCallback(() => {
+    dispatch(loginWithApple() as any).catch((error: any) => {
+      Alert.alert('Error', error.message || 'Apple login failed');
+    });
+  }, [dispatch]);
 
   return (
     <ScrollView
@@ -98,6 +110,28 @@ export const LoginScreen: React.FC = () => {
           loading={isLoading}
           disabled={!formik.isValid || isLoading}
         />
+
+        <View style={styles.dividerContainer}>
+          <View style={styles.divider} />
+          <Text style={styles.dividerText}>Or continue with</Text>
+          <View style={styles.divider} />
+        </View>
+
+        <SocialLoginButton
+          provider="google"
+          onPress={handleGoogleLogin}
+          loading={isLoading}
+          disabled={isLoading}
+        />
+
+        {Platform.OS === 'ios' && (
+          <SocialLoginButton
+            provider="apple"
+            onPress={handleAppleLogin}
+            loading={isLoading}
+            disabled={isLoading}
+          />
+        )}
       </View>
 
       <View style={styles.footer}>
@@ -175,5 +209,20 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.fontSizes.sm,
     color: theme.colors.primary,
     fontWeight: theme.typography.fontWeights.medium,
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: theme.spacing.lg,
+  },
+  divider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: theme.colors.border,
+  },
+  dividerText: {
+    marginHorizontal: theme.spacing.md,
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.textLight,
   },
 });
