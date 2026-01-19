@@ -22,7 +22,7 @@ jobs:
         with:
           node-version: 18.x
       - name: Cache npm
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           path: ~/.npm
           key: ${{ runner.os }}-backend-npm-${{ hashFiles('**/package-lock.json') }}
@@ -49,7 +49,7 @@ jobs:
         with:
           node-version: 18.x
       - name: Cache npm
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           path: ~/.npm
           key: ${{ runner.os }}-backend-npm-${{ hashFiles('**/package-lock.json') }}
@@ -100,7 +100,7 @@ jobs:
         with:
           node-version: 18.x
       - name: Cache npm
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           path: ~/.npm
           key: ${{ runner.os }}-backend-npm-${{ hashFiles('**/package-lock.json') }}
@@ -170,7 +170,7 @@ jobs:
         with:
           node-version: 18.x
       - name: Cache npm
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           path: ~/.npm
           key: ${{ runner.os }}-backend-npm-${{ hashFiles('**/package-lock.json') }}
@@ -240,7 +240,7 @@ jobs:
         with:
           node-version: 18.x
       - name: Cache npm
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           path: ~/.npm
           key: ${{ runner.os }}-backend-npm-${{ hashFiles('**/package-lock.json') }}
@@ -291,7 +291,7 @@ jobs:
         with:
           node-version: 18.x
       - name: Cache npm
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           path: ~/.npm
           key: ${{ runner.os }}-backend-npm-${{ hashFiles('**/package-lock.json') }}
@@ -321,7 +321,7 @@ jobs:
         with:
           node-version: 18.x
       - name: Cache npm
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           path: ~/.npm
           key: ${{ runner.os }}-backend-npm-${{ hashFiles('**/package-lock.json') }}
