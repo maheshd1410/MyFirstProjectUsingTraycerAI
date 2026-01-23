@@ -1,7 +1,14 @@
+// New placeholder screens for Phase 3
+export { HomeScreen } from './Home/HomeScreen';
+export { ProductListScreen } from './Products/ProductListScreen';
+export { ProductDetailScreen } from './Products/ProductDetailScreen';
+export { OrdersScreen } from './Orders/OrdersScreen';
+
+// Existing screens
 export { LoginScreen } from './auth/LoginScreen';
 export { RegisterScreen } from './auth/RegisterScreen';
 export { ProductListScreen } from './product/ProductListScreen';
-export { ProductDetailScreen } from './product/ProductDetailScreen';
+export { ProductDetailScreen as LegacyProductDetailScreen } from './product/ProductDetailScreen';
 export { CartScreen } from './cart/CartScreen';
 export { AddressListScreen } from './address/AddressListScreen';
 export { AddressFormScreen } from './address/AddressFormScreen';

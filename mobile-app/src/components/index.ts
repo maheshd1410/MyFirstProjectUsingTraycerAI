@@ -1,6 +1,15 @@
+// New Material Design 3 components
+export { Button } from './button';
+export type { ButtonProps } from './button/Button.types';
+export { TextInput } from './input';
+export type { TextInputProps } from './input/TextInput.types';
+export { Card } from './card';
+export { Modal } from './modal';
+export { Header } from './header';
+
+// Existing components
 export { Input } from './Input';
-export { Button } from './Button';
-export { ProductCard } from './ProductCard';
+export { ProductCard } from './product';
 export { FilterModal } from './FilterModal';
 export { ReviewList } from './ReviewList';
 export { OrderCancellationModal } from './OrderCancellationModal';

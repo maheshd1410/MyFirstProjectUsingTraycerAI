@@ -1,273 +1,285 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
-  TouchableOpacity,
   Image,
-  SafeAreaView,
-  ActivityIndicator,
+  Pressable,
   Alert,
-  RefreshControl,
 } from 'react-native';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import {
-  fetchCart,
-  updateCartItem,
-  removeFromCart,
-  clearCartAsync,
-  selectCartItems,
-  selectCartLoading,
-  selectCartError,
-  selectCartTotal,
-  selectCartItemCount,
-} from '../../store/cart/cartSlice';
-import { Button, OfflineBanner, CartItemSkeleton } from '../../components';
-import { useNetworkStatus } from '../../utils/network';
-import { formatErrorForDisplay } from '../../utils/errorMessages';
-import { theme } from '../../theme';
-import { CartItem } from '../../types';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
+import { useAppTheme } from '../../theme';
+import { useCart } from '../../state';
+import { Button } from '../../components';
+import type { LocalCartItem } from '../../state';
 
-type AppStackParamList = {
-  Cart: undefined;
-  ProductList: undefined;
-};
+export const CartScreen: React.FC = () => {
+  const theme = useAppTheme();
+  const navigation = useNavigation();
+  const { state, updateQuantity, removeFromCart } = useCart();
 
-type Props = NativeStackScreenProps<AppStackParamList, 'Cart'>;
-
-export const CartScreen: React.FC<Props> = ({ navigation }) => {
-  const dispatch = useAppDispatch();
-  const { isConnected } = useNetworkStatus();
-  const items = useAppSelector(selectCartItems);
-  const loading = useAppSelector(selectCartLoading);
-  const error = useAppSelector(selectCartError);
-  const totalAmount = useAppSelector(selectCartTotal);
-  const itemCount = useAppSelector(selectCartItemCount);
-  const [refreshing, setRefreshing] = React.useState(false);
-
-  useEffect(() => {
-    if (isConnected) {
-      dispatch(fetchCart());
-    }
-  }, [dispatch, isConnected]);
-
-  const handleQuantityIncrease = (item: CartItem) => {
-    if (!isConnected) {
-      Alert.alert('Offline', 'Changes will be synced when you\'re back online');
-    }
-    dispatch(updateCartItem({ itemId: item.id, quantity: item.quantity + 1 }));
+  const handleQuantityChange = (itemId: string, currentQuantity: number, delta: number) => {
+    const newQuantity = currentQuantity + delta;
+    if (newQuantity < 1) return;
+    updateQuantity(itemId, newQuantity);
   };
 
-  const handleQuantityDecrease = (item: CartItem) => {
-    if (item.quantity > 1) {
-      dispatch(updateCartItem({ itemId: item.id, quantity: item.quantity - 1 }));
-    }
+  const handleRemoveItem = (itemId: string, productName: string) => {
+    Alert.alert(
+      'Remove Item',
+      `Remove ${productName} from cart?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => removeFromCart(itemId),
+        },
+      ]
+    );
   };
 
-  const handleRemoveItem = (itemId: string) => {
-    dispatch(removeFromCart(itemId));
-  };
-
-  const handleClearCart = () => {
-    dispatch(clearCartAsync());
+  const handleProceedToCheckout = () => {
+    navigation.navigate('Checkout' as never);
   };
 
   const handleContinueShopping = () => {
-    navigation.navigate('ProductList');
+    navigation.navigate('MainTabs' as never, { screen: 'Products' } as never);
   };
 
-  const handleRefresh = async () => {
-    if (!isConnected) {
-      Alert.alert('Offline', 'Cannot refresh while offline. Showing cached cart.');
-      return;
-    }
-    setRefreshing(true);
-    await dispatch(fetchCart()).unwrap().catch(() => {});
-    setRefreshing(false);
-  };
-
-  const renderCartItem = ({ item }: { item: CartItem }) => {
-    const displayPrice = item.discountPrice ? parseFloat(item.discountPrice) : parseFloat(item.price);
+  const renderItem = ({ item }: { item: LocalCartItem }) => {
+    const price = item.discountPrice ? parseFloat(item.discountPrice) : parseFloat(item.price);
     const originalPrice = parseFloat(item.price);
-    const hasDiscount = item.discountPrice && parseFloat(item.discountPrice) < originalPrice;
+    const subtotal = price * item.quantity;
+    const hasDiscount = !!item.discountPrice;
 
     return (
-      <View style={styles.cartItemContainer}>
-        <Image source={{ uri: item.productImage }} style={styles.itemImage as any} />
-
+      <View
+        style={[
+          styles.cartItem,
+          {
+            backgroundColor: theme.colors.surface,
+            borderRadius: theme.radius.lg,
+            padding: theme.spacing.md,
+            marginBottom: theme.spacing.md,
+            ...theme.elevation[1],
+          },
+        ]}
+      >
+        <Image
+          source={{ uri: item.productImage }}
+          style={[styles.itemImage, { backgroundColor: theme.colors.surfaceVariant }]}
+        />
         <View style={styles.itemDetails}>
-          <Text style={styles.itemName} numberOfLines={2}>
+          <Text
+            style={[theme.typography.bodyLarge, { color: theme.colors.onSurface, fontWeight: '600' }]}
+            numberOfLines={2}
+          >
             {item.productName}
           </Text>
-
           {item.variantName && (
-            <Text style={styles.variantInfo} numberOfLines={1}>
-              {item.variantName}
+            <Text
+              style={[
+                theme.typography.bodySmall,
+                { color: theme.colors.onSurfaceVariant, marginTop: theme.spacing.xs },
+              ]}
+            >
+              Variant: {item.variantName}
             </Text>
           )}
-
-          {item.variantAttributes && Object.keys(item.variantAttributes).length > 0 && (
-            <View style={styles.variantAttributesTags}>
-              {Object.entries(item.variantAttributes).map(([key, value]) => (
-                <View key={key} style={styles.variantAttribute}>
-                  <Text style={styles.variantAttributeText}>
-                    {key}: {value}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          )}
-
-          <View style={styles.priceContainer}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: theme.spacing.xs }}>
             {hasDiscount ? (
               <>
-                <Text style={styles.discountPrice}>₹{displayPrice.toFixed(2)}</Text>
-                <Text style={styles.originalPrice}>₹{originalPrice.toFixed(2)}</Text>
+                <Text
+                  style={[
+                    theme.typography.titleMedium,
+                    { color: theme.colors.primary, fontWeight: '600' },
+                  ]}
+                >
+                  ₹{price.toFixed(2)}
+                </Text>
+                <Text
+                  style={[
+                    theme.typography.bodySmall,
+                    {
+                      color: theme.colors.onSurfaceVariant,
+                      textDecorationLine: 'line-through',
+                      marginLeft: theme.spacing.sm,
+                    },
+                  ]}
+                >
+                  ₹{originalPrice.toFixed(2)}
+                </Text>
               </>
             ) : (
-              <Text style={styles.price}>₹{displayPrice.toFixed(2)}</Text>
+              <Text
+                style={[
+                  theme.typography.titleMedium,
+                  { color: theme.colors.primary, fontWeight: '600' },
+                ]}
+              >
+                ₹{price.toFixed(2)}
+              </Text>
             )}
           </View>
 
-          <Text style={styles.subtotal}>
-            Subtotal: ₹{parseFloat(item.subtotal).toFixed(2)}
-          </Text>
+          <View style={[styles.itemActions, { marginTop: theme.spacing.sm }]}>
+            <View style={styles.quantityControls}>
+              <Pressable
+                onPress={() => handleQuantityChange(item.id, item.quantity, -1)}
+                disabled={item.quantity <= 1}
+                style={[
+                  styles.quantityButton,
+                  {
+                    backgroundColor: item.quantity <= 1 ? theme.colors.surfaceVariant : theme.colors.primaryContainer,
+                    borderRadius: theme.radius.sm,
+                  },
+                ]}
+              >
+                <Ionicons
+                  name="remove"
+                  size={18}
+                  color={item.quantity <= 1 ? theme.colors.onSurfaceVariant : theme.colors.onPrimaryContainer}
+                />
+              </Pressable>
+              <Text
+                style={[
+                  theme.typography.titleMedium,
+                  { color: theme.colors.onSurface, marginHorizontal: theme.spacing.md },
+                ]}
+              >
+                {item.quantity}
+              </Text>
+              <Pressable
+                onPress={() => handleQuantityChange(item.id, item.quantity, 1)}
+                style={[
+                  styles.quantityButton,
+                  {
+                    backgroundColor: theme.colors.primaryContainer,
+                    borderRadius: theme.radius.sm,
+                  },
+                ]}
+              >
+                <Ionicons name="add" size={18} color={theme.colors.onPrimaryContainer} />
+              </Pressable>
+            </View>
 
-          <View style={styles.quantityContainer}>
-            <TouchableOpacity
-              style={styles.quantityButton}
-              onPress={() => handleQuantityDecrease(item)}
+            <Pressable
+              onPress={() => handleRemoveItem(item.id, item.productName)}
+              style={[styles.removeButton, { marginLeft: theme.spacing.md }]}
             >
-              <Text style={styles.quantityButtonText}>−</Text>
-            </TouchableOpacity>
-            <Text style={styles.quantity}>{item.quantity}</Text>
-            <TouchableOpacity
-              style={styles.quantityButton}
-              onPress={() => handleQuantityIncrease(item)}
-            >
-              <Text style={styles.quantityButtonText}>+</Text>
-            </TouchableOpacity>
+              <Ionicons name="trash-outline" size={20} color={theme.colors.error} />
+            </Pressable>
           </View>
-        </View>
 
-        <TouchableOpacity
-          style={styles.removeButton}
-          onPress={() => handleRemoveItem(item.id)}
-        >
-          <Text style={styles.removeButtonText}>🗑️</Text>
-        </TouchableOpacity>
+          <Text
+            style={[
+              theme.typography.bodyMedium,
+              { color: theme.colors.onSurfaceVariant, marginTop: theme.spacing.xs },
+            ]}
+          >
+            Subtotal: ₹{subtotal.toFixed(2)}
+          </Text>
+        </View>
       </View>
     );
   };
 
   const renderEmptyCart = () => (
-    <View style={styles.emptyContainer}>
-      <Text style={styles.emptyIcon}>🛒</Text>
-      <Text style={styles.emptyTitle}>Your cart is empty</Text>
-      <Text style={styles.emptyMessage}>Add items from our products to get started</Text>
-      <Button title="Continue Shopping" onPress={handleContinueShopping} />
+    <View style={[styles.emptyContainer, { padding: theme.spacing.xl }]}>
+      <Ionicons name="cart-outline" size={80} color={theme.colors.onSurfaceVariant} />
+      <Text
+        style={[
+          theme.typography.titleLarge,
+          { color: theme.colors.onSurface, marginTop: theme.spacing.md, textAlign: 'center' },
+        ]}
+      >
+        Your cart is empty
+      </Text>
+      <Text
+        style={[
+          theme.typography.bodyMedium,
+          { color: theme.colors.onSurfaceVariant, marginTop: theme.spacing.sm, textAlign: 'center' },
+        ]}
+      >
+        Add products to your cart to see them here
+      </Text>
+      <Button
+        onPress={handleContinueShopping}
+        variant="filled"
+        style={{ marginTop: theme.spacing.lg }}
+      >
+        Continue Shopping
+      </Button>
     </View>
   );
 
-  if (loading.fetch && items.length === 0) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <FlatList
-          data={Array.from({ length: 5 })}
-          renderItem={() => <CartItemSkeleton />}
-          keyExtractor={(_, index) => `skeleton-${index}`}
-          contentContainerStyle={styles.listContent}
-        />
-      </SafeAreaView>
-    );
-  }
-
-  if (error) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <OfflineBanner />
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Failed to load cart</Text>
-          <Text style={styles.errorMessage}>{formatErrorForDisplay(error)}</Text>
-          <Button
-            title="Retry"
-            onPress={() => dispatch(fetchCart())}
-            disabled={!isConnected}
-          />
-        </View>
-      </SafeAreaView>
-    );
-  }
-
   return (
-    <SafeAreaView style={styles.container}>
-      <OfflineBanner />
-      {items.length === 0 ? (
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+      edges={['bottom']}
+    >
+      <View style={[styles.header, { paddingHorizontal: theme.spacing.md, paddingVertical: theme.spacing.md }]}>
+        <Text style={[theme.typography.titleLarge, { color: theme.colors.onSurface }]}>
+          Cart ({state.totalQuantity} {state.totalQuantity === 1 ? 'item' : 'items'})
+        </Text>
+      </View>
+
+      {state.items.length === 0 ? (
         renderEmptyCart()
       ) : (
         <>
           <FlatList
-            data={items}
-            renderItem={renderCartItem}
+            data={state.items}
+            renderItem={renderItem}
             keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.listContent}
-            scrollEnabled={true}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={handleRefresh}
-                colors={[theme.colors.primary]}
-              />
-            }
+            contentContainerStyle={{
+              paddingHorizontal: theme.spacing.md,
+              paddingTop: theme.spacing.sm,
+              paddingBottom: theme.spacing.md,
+            }}
           />
 
-          <View style={styles.summaryContainer}>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Items:</Text>
-              <Text style={styles.summaryValue}>{itemCount}</Text>
+          <View
+            style={[
+              styles.footer,
+              {
+                backgroundColor: theme.colors.surface,
+                padding: theme.spacing.md,
+                borderTopWidth: 1,
+                borderTopColor: theme.colors.outlineVariant,
+                ...theme.elevation[2],
+              },
+            ]}
+          >
+            <View style={styles.footerRow}>
+              <Text style={[theme.typography.bodyLarge, { color: theme.colors.onSurfaceVariant }]}>
+                Total Items:
+              </Text>
+              <Text style={[theme.typography.bodyLarge, { color: theme.colors.onSurface }]}>
+                {state.totalQuantity}
+              </Text>
             </View>
-
-            <View style={styles.summaryRow}>
-              <Text style={styles.totalLabel}>Total:</Text>
-              <Text style={styles.totalValue}>₹{parseFloat(totalAmount).toFixed(2)}</Text>
+            <View style={[styles.footerRow, { marginTop: theme.spacing.xs }]}>
+              <Text style={[theme.typography.titleMedium, { color: theme.colors.onSurface }]}>
+                Total Amount:
+              </Text>
+              <Text
+                style={[theme.typography.titleLarge, { color: theme.colors.primary, fontWeight: '600' }]}
+              >
+                ₹{state.totalAmount.toFixed(2)}
+              </Text>
             </View>
-
-            {!isConnected && (
-              <View style={styles.offlineNotice}>
-                <Text style={styles.offlineNoticeText}>
-                  ⚠️ Checkout requires internet connection
-                </Text>
-              </View>
-            )}
-
             <Button
-              title="Proceed to Checkout"
-              onPress={() => {
-                if (!isConnected) {
-                  Alert.alert(
-                    'Offline',
-                    'Please connect to the internet to proceed with checkout'
-                  );
-                } else {
-                  navigation.navigate('Checkout' as never);
-                }
-              }}
-              style={[
-                styles.checkoutButton,
-                !isConnected && styles.checkoutButtonDisabled,
-              ]}
-              disabled={!isConnected}
-            />
-
-            <TouchableOpacity
-              style={styles.clearButton}
-              onPress={handleClearCart}
-              disabled={loading.action}
+              onPress={handleProceedToCheckout}
+              variant="filled"
+              style={{ marginTop: theme.spacing.md }}
             >
-              <Text style={styles.clearButtonText}>Clear Cart</Text>
-            </TouchableOpacity>
+              Proceed to Checkout
+            </Button>
           </View>
         </>
       )}
@@ -278,226 +290,46 @@ export const CartScreen: React.FC<Props> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
   },
-  loadingContainer: {
+  header: {},
+  cartItem: {
+    flexDirection: 'row',
+  },
+  itemImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+  },
+  itemDetails: {
     flex: 1,
-    justifyContent: 'center',
+    marginLeft: 12,
+  },
+  itemActions: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  loadingText: {
-    marginTop: theme.spacing.md,
-    fontSize: theme.typography.fontSizes.base,
-    color: theme.colors.text,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  quantityControls: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: theme.spacing.lg,
   },
-  errorText: {
-    fontSize: theme.typography.fontSizes.lg,
-    fontWeight: theme.typography.fontWeights.bold as any,
-    color: theme.colors.error,
-    marginBottom: theme.spacing.sm,
+  quantityButton: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  errorMessage: {
-    fontSize: theme.typography.fontSizes.base,
-    color: theme.colors.textLight,
-    marginBottom: theme.spacing.lg,
-    textAlign: 'center',
+  removeButton: {
+    padding: 8,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: theme.spacing.lg,
   },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: theme.spacing.md,
-  },
-  emptyTitle: {
-    fontSize: theme.typography.fontSizes.xl,
-    fontWeight: theme.typography.fontWeights.bold as any,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.sm,
-    textAlign: 'center',
-  },
-  emptyMessage: {
-    fontSize: theme.typography.fontSizes.base,
-    color: theme.colors.textLight,
-    marginBottom: theme.spacing.lg,
-    textAlign: 'center',
-  },
-  listContent: {
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.md,
-  },
-  cartItemContainer: {
-    flexDirection: 'row',
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.md,
-    marginBottom: theme.spacing.md,
-    padding: theme.spacing.md,
-    alignItems: 'center',
-  },
-  itemImage: {
-    width: 80,
-    height: 80,
-    borderRadius: theme.borderRadius.sm,
-    marginRight: theme.spacing.md,
-  },
-  itemDetails: {
-    flex: 1,
-  },
-  itemName: {
-    fontSize: theme.typography.fontSizes.base,
-    fontWeight: theme.typography.fontWeights.semibold as any,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.xs,
-  },
-  priceContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: theme.spacing.xs,
-  },
-  price: {
-    fontSize: theme.typography.fontSizes.base,
-    fontWeight: theme.typography.fontWeights.bold as any,
-    color: theme.colors.primary,
-  },
-  discountPrice: {
-    fontSize: theme.typography.fontSizes.base,
-    fontWeight: theme.typography.fontWeights.bold as any,
-    color: theme.colors.primary,
-    marginRight: theme.spacing.sm,
-  },
-  originalPrice: {
-    fontSize: theme.typography.fontSizes.sm,
-    color: theme.colors.textLight,
-    textDecorationLine: 'line-through' as any,
-  },
-  subtotal: {
-    fontSize: theme.typography.fontSizes.sm,
-    color: theme.colors.textLight,
-    marginBottom: theme.spacing.xs,
-  },
-  quantityContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: theme.spacing.sm,
-  },
-  quantityButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: theme.colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  quantityButtonText: {
-    color: theme.colors.background,
-    fontSize: theme.typography.fontSizes.lg,
-    fontWeight: theme.typography.fontWeights.bold as any,
-  },
-  quantity: {
-    marginHorizontal: theme.spacing.sm,
-    fontSize: theme.typography.fontSizes.base,
-    color: theme.colors.text,
-    minWidth: 20,
-    textAlign: 'center',
-  },
-  removeButton: {
-    padding: theme.spacing.sm,
-  },
-  removeButtonText: {
-    fontSize: 18,
-  },
-  summaryContainer: {
-    backgroundColor: theme.colors.surface,
-    borderTopLeftRadius: theme.borderRadius.lg,
-    borderTopRightRadius: theme.borderRadius.lg,
-    padding: theme.spacing.lg,
-    paddingBottom: theme.spacing.xl,
-  },
-  summaryRow: {
+  footer: {},
+  footerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: theme.spacing.md,
-  },
-  summaryLabel: {
-    fontSize: theme.typography.fontSizes.base,
-    color: theme.colors.textLight,
-  },
-  summaryValue: {
-    fontSize: theme.typography.fontSizes.base,
-    fontWeight: theme.typography.fontWeights.semibold as any,
-    color: theme.colors.text,
-  },
-  totalLabel: {
-    fontSize: theme.typography.fontSizes.lg,
-    fontWeight: theme.typography.fontWeights.bold as any,
-    color: theme.colors.text,
-  },
-  totalValue: {
-    fontSize: theme.typography.fontSizes.lg,
-    fontWeight: theme.typography.fontWeights.bold as any,
-    color: theme.colors.primary,
-  },
-  checkoutButton: {
-    marginTop: theme.spacing.md,
-    marginBottom: theme.spacing.sm,
-  },
-  checkoutButtonDisabled: {
-    opacity: 0.5,
-  },
-  offlineNotice: {
-    backgroundColor: theme.colors.warning + '20',
-    padding: theme.spacing.md,
-    borderRadius: 8,
-    marginTop: theme.spacing.md,
-    borderWidth: 1,
-    borderColor: theme.colors.warning,
-  },
-  offlineNoticeText: {
-    color: theme.colors.warning,
-    fontSize: theme.typography.fontSizes.sm,
-    textAlign: 'center',
-    fontWeight: theme.typography.fontWeights.medium as any,
-  },
-  clearButton: {
-    paddingVertical: theme.spacing.md,
     alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-    marginTop: theme.spacing.md,
   },
-  clearButtonText: {
-    color: theme.colors.error,
-    fontSize: theme.typography.fontSizes.base,
-    fontWeight: theme.typography.fontWeights.semibold as any,
-  },
-  variantInfo: {
-    fontSize: theme.typography.fontSizes.sm,
-    color: theme.colors.primary,
-    fontWeight: theme.typography.fontWeights.semibold as any,
-    marginTop: 4,
-  },
-  variantAttributesTags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 6,
-    gap: 6,
-  },
-  variantAttribute: {
-    backgroundColor: theme.colors.surface,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 4,
-  },
-  variantAttributeText: {
-    fontSize: theme.typography.fontSizes.xs,
-    color: theme.colors.textLight,
-  },
+});

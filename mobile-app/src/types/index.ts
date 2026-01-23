@@ -124,7 +124,7 @@ export interface Product {
   };
   stockQuantity: number;
   weight?: number;
-  unit: 'KG' | 'GRAM' | 'PIECE' | 'BOX';
+  unit: 'KG' | 'GRAM' | 'PIECE' | 'BOX' | 'LITRE';
   isFeatured: boolean;
   averageRating: number;
   totalReviews: number;

@@ -19,7 +19,6 @@ import { useProducts } from '../../hooks';
 import { useReviews } from '../../hooks/useReviews';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { selectIsAuthenticated } from '../../store/auth/authSlice';
-import { addToCart, selectCartLoading } from '../../store/cart/cartSlice';
 import {
   addToWishlistAsync,
   removeFromWishlistAsync,
@@ -28,6 +27,8 @@ import {
   fetchWishlist,
   selectWishlist,
 } from '../../store/wishlist/wishlistSlice';
+import { useCart } from '../../state';
+import type { LocalCartItem } from '../../state';
 import { Button, ReviewList } from '../../components';
 import { theme } from '../../theme';
 import { AppStackParamList } from '../../navigation/AppNavigator';
@@ -43,7 +44,7 @@ export const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     useProducts();
   const { reviews, loadProductReviews } = useReviews();
   const dispatch = useAppDispatch();
-  const addingToCart = useAppSelector(selectCartLoading);
+  const { addToCart } = useCart();
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const wishlistLoading = useAppSelector(selectWishlistLoading);
   const wishlist = useAppSelector(selectWishlist);
@@ -144,9 +145,22 @@ export const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     : 0;
   const totalPrice = (displayPrice * quantity).toFixed(2);
 
-  const handleAddToCart = async () => {
+  const handleAddToCart = () => {
     try {
-      const result = await dispatch(addToCart({ productId, quantity, variantId: selectedVariant?.id })).unwrap();
+      const cartItem: LocalCartItem = {
+        id: selectedVariant?.id ? `${productId}-${selectedVariant.id}` : productId,
+        productId,
+        productName: product.name,
+        productImage: product.images[0],
+        price: product.price,
+        discountPrice: product.discountPrice,
+        quantity,
+        variantId: selectedVariant?.id,
+        variantName: selectedVariant?.name,
+        variantAttributes: selectedVariant?.attributes,
+      };
+      
+      addToCart(cartItem);
       
       Alert.alert(
         'Success',
@@ -457,9 +471,8 @@ export const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           {/* Add to Cart Button */}
           {product.stockQuantity > 0 ? (
             <Button
-              title={addingToCart.action ? 'Adding to Cart...' : `Add ${quantity} to Cart`}
+              title={`Add ${quantity} to Cart`}
               onPress={handleAddToCart}
-              disabled={addingToCart.action}
               style={styles.addButton}
             />
           ) : (
