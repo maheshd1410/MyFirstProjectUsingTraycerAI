@@ -55,7 +55,7 @@
     "@expo/webpack-config": "^18.0.1",
     "@types/react": "^18.0.0",
     "@types/react-native": "^0.71.0",
-    "@typescript-eslint/eslint-plugin": "^5.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.53.1",
     "@typescript-eslint/parser": "^5.0.0",
     "babel-plugin-transform-remove-console": "^6.9.4",
     "eslint": "^8.0.0",
