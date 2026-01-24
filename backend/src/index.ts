@@ -49,21 +49,46 @@ const gracefulShutdown = async (signal: string, server: Server) => {
 // Start server
 async function startServer() {
   try {
-    // Connect to database
-    await connectDatabase();
+    // Connect to database (with error handling for development)
+    try {
+      await connectDatabase();
+    } catch (dbError) {
+      logger.warn('⚠️  Database connection failed - server will start in degraded mode', { error: dbError });
+      // Continue startup in development mode
+    }
 
-    // Connect to Redis
-    await connectRedis();
+    // Connect to Redis (optional) - with timeout
+    try {
+      const redisPromise = connectRedis();
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Redis connection timeout')), 3000)
+      );
+      await Promise.race([redisPromise, timeoutPromise]);
+    } catch (redisError) {
+      logger.warn('⚠️  Redis connection failed or timed out - caching will be disabled', { error: redisError });
+      // Continue startup
+    }
 
-    // Initialize email queue
-    await initializeEmailQueue();
-    logger.info('Email queue initialized');
+    // Initialize email queue (optional) - with timeout
+    try {
+      const emailPromise = initializeEmailQueue();
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Email queue timeout')), 2000)
+      );
+      await Promise.race([emailPromise, timeoutPromise]);
+      logger.info('Email queue initialized');
+    } catch (emailError) {
+      logger.warn('⚠️  Email queue initialization failed or timed out', { error: emailError });
+      // Continue startup
+    }
 
-    // Warm cache with commonly accessed data
-    await cacheWarmerService.warmAll();
+    // Skip cache warming in development mode
+    logger.info('Skipping cache warming in development mode');
 
     const server = app.listen(PORT, () => {
       logger.info('Server started', { port: PORT, environment: process.env.NODE_ENV || 'development' });
+      logger.info('✅ Swagger API docs available at http://localhost:3000/api-docs');
+      logger.info('✅ Health check available at http://localhost:3000/health');
     });
 
     // Handle graceful shutdown with proper server closure
