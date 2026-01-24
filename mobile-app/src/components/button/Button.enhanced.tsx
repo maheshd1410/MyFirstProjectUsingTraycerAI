@@ -14,8 +14,6 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export const Button: React.FC<ButtonProps> = ({
   label,
-  children,
-  title,
   onPress,
   variant = 'filled',
   loading = false,
@@ -23,12 +21,9 @@ export const Button: React.FC<ButtonProps> = ({
   fullWidth = false,
   leadingIcon,
   trailingIcon,
-  style,
   accessibilityLabel,
   accessibilityHint,
 }) => {
-  // Support multiple API patterns: label (new), children (old), title (old)
-  const buttonText = label || title || (typeof children === 'string' ? children : '');
   const theme = useAppTheme();
   const scale = useSharedValue(1);
   const opacity = useSharedValue(1);
@@ -65,7 +60,6 @@ export const Button: React.FC<ButtonProps> = ({
       width: fullWidth ? '100%' : 'auto',
       ...ensureTouchTarget(44),
     },
-    style,
   ];
 
   const textStyle = [
@@ -106,7 +100,7 @@ export const Button: React.FC<ButtonProps> = ({
       disabled={disabled || loading}
       accessible
       accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel || getButtonAccessibilityLabel(buttonText, state)}
+      accessibilityLabel={accessibilityLabel || getButtonAccessibilityLabel(label, state)}
       accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled: disabled || loading, busy: loading }}
       style={[containerStyle, animatedStyle]}
@@ -116,22 +110,20 @@ export const Button: React.FC<ButtonProps> = ({
           size="small"
           color={getTextColor()}
         />
-      ) : buttonText ? (
+      ) : (
         <>
           {leadingIcon && (
             <View style={{ marginRight: theme.spacing.sm }}>
               {leadingIcon}
             </View>
           )}
-          <Text style={textStyle}>{buttonText}</Text>
+          <Text style={textStyle}>{label}</Text>
           {trailingIcon && (
             <View style={{ marginLeft: theme.spacing.sm }}>
               {trailingIcon}
             </View>
           )}
         </>
-      ) : (
-        children
       )}
     </AnimatedPressable>
   );

@@ -1,24 +1,26 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
-  Platform,
   Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
-import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { loginWithGoogle, loginWithApple, selectAuthLoading, selectAuthError } from '../../store/auth/authSlice';
-import { Input, Button } from '../../components';
-import { SocialLoginButton } from '../../components/SocialLoginButton';
+import { TextInput } from '../../components/input/TextInput';
+import { Button } from '../../components/button/Button';
 import { theme } from '../../theme';
 import { AuthStackParamList } from '../../navigation/AuthNavigator';
+import { FadeIn } from '../../animations/FadeIn';
+import { 
+  getInputAccessibilityLabel, 
+  getAccessibilityHint,
+  ensureTouchTarget 
+} from '../../utils/accessibility';
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Login'>;
 
@@ -33,10 +35,9 @@ const validationSchema = Yup.object().shape({
 
 export const LoginScreen: React.FC = () => {
   const navigation = useNavigation<LoginScreenNavigationProp>();
-  const dispatch = useAppDispatch();
-  const isLoading = useAppSelector(selectAuthLoading);
-  const authError = useAppSelector(selectAuthError);
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const touchTargetStyle = ensureTouchTarget(44);
 
   const formik = useFormik({
     initialValues: {
@@ -45,103 +46,111 @@ export const LoginScreen: React.FC = () => {
     },
     validationSchema,
     onSubmit: async (values) => {
-      // Implement email/password login if you have it
-      Alert.alert('Coming Soon', 'Email/password login coming soon');
+      setLoading(true);
+      try {
+        // Simulate API call
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Mock successful login - in real app, call API and navigate based on response
+        Alert.alert('Success', 'Login successful!');
+        // Navigation handled by parent (App.tsx should switch to authenticated stack)
+      } catch (error) {
+        Alert.alert('Login Failed', 'An error occurred while logging in');
+      } finally {
+        setLoading(false);
+      }
     },
   });
-
-  const handleGoogleLogin = useCallback(() => {
-    dispatch(loginWithGoogle() as any).catch((error: any) => {
-      Alert.alert('Error', error.message || 'Google login failed');
-    });
-  }, [dispatch]);
-
-  const handleAppleLogin = useCallback(() => {
-    dispatch(loginWithApple() as any).catch((error: any) => {
-      Alert.alert('Error', error.message || 'Apple login failed');
-    });
-  }, [dispatch]);
 
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.contentContainer}
       showsVerticalScrollIndicator={false}
+      accessibilityLabel="Login screen"
+      accessibilityRole="none"
     >
       <View style={styles.header}>
-        <Text style={styles.title}>Welcome Back</Text>
+        <Text 
+          style={styles.title}
+          accessibilityRole="header"
+        >
+          Welcome Back
+        </Text>
         <Text style={styles.subtitle}>Login to your Ladoo Business account</Text>
       </View>
 
-      <View style={styles.form}>
-        {authError && (
-          <View style={styles.errorBanner}>
-            <Text style={styles.errorText}>{authError}</Text>
-          </View>
-        )}
-
-        <Input
-          label="Email"
-          placeholder="Enter your email"
-          keyboardType="email-address"
-          autoCapitalize="none"
-          value={formik.values.email}
-          onChangeText={formik.handleChange('email')}
-          onBlur={formik.handleBlur('email')}
-          error={formik.touched.email ? formik.errors.email : undefined}
-          editable={!isLoading}
-        />
-
-        <Input
-          label="Password"
-          placeholder="Enter your password"
-          secureTextEntry={!showPassword}
-          value={formik.values.password}
-          onChangeText={formik.handleChange('password')}
-          onBlur={formik.handleBlur('password')}
-          error={formik.touched.password ? formik.errors.password : undefined}
-          onRightIconPress={() => setShowPassword(!showPassword)}
-          editable={!isLoading}
-        />
-
-        <Button
-          title={isLoading ? 'Logging in...' : 'Login'}
-          onPress={() => formik.handleSubmit()}
-          loading={isLoading}
-          disabled={!formik.isValid || isLoading}
-        />
-
-        <View style={styles.dividerContainer}>
-          <View style={styles.divider} />
-          <Text style={styles.dividerText}>Or continue with</Text>
-          <View style={styles.divider} />
-        </View>
-
-        <SocialLoginButton
-          provider="google"
-          onPress={handleGoogleLogin}
-          loading={isLoading}
-          disabled={isLoading}
-        />
-
-        {Platform.OS === 'ios' && (
-          <SocialLoginButton
-            provider="apple"
-            onPress={handleAppleLogin}
-            loading={isLoading}
-            disabled={isLoading}
+      <FadeIn duration={300}>
+        <View style={styles.form}>
+          <TextInput
+            label="Email"
+            placeholder="Enter your email"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            value={formik.values.email}
+            onChangeText={formik.handleChange('email')}
+            onBlur={formik.handleBlur('email')}
+            editable={!loading}
+            required
+            accessibilityHint={getAccessibilityHint('enter your email address')}
+            accessibilityLabel={getInputAccessibilityLabel('Email', true)}
           />
-        )}
-      </View>
+          {formik.touched.email && formik.errors.email && (
+            <Text style={[styles.errorText, { color: theme.colors.error }]}>
+              {formik.errors.email}
+            </Text>
+          )}
+
+          <TextInput
+            label="Password"
+            placeholder="Enter your password"
+            secureTextEntry={!showPassword}
+            value={formik.values.password}
+            onChangeText={formik.handleChange('password')}
+            onBlur={formik.handleBlur('password')}
+            editable={!loading}
+            required
+            accessibilityHint={getAccessibilityHint('enter your password')}
+            accessibilityLabel={getInputAccessibilityLabel('Password', true)}
+          />
+          {formik.touched.password && formik.errors.password && (
+            <Text style={[styles.errorText, { color: theme.colors.error }]}>
+              {formik.errors.password}
+            </Text>
+          )}
+
+          <Button
+            label={loading ? 'Logging in...' : 'Login'}
+            onPress={() => formik.handleSubmit()}
+            disabled={!formik.isValid || loading}
+            fullWidth
+            accessibilityLabel={loading ? 'Logging in, please wait' : 'Login button'}
+            accessibilityHint={loading ? '' : getAccessibilityHint('login to your account')}
+          />
+        </View>
+      </FadeIn>
 
       <View style={styles.footer}>
         <Text style={styles.footerText}>Don't have an account? </Text>
-        <TouchableOpacity onPress={() => navigation.navigate('Register')} disabled={isLoading}>
+        <TouchableOpacity 
+          onPress={() => navigation.navigate('Register')} 
+          disabled={loading}
+          style={touchTargetStyle}
+          accessibilityRole="link"
+          accessibilityLabel="Sign up for a new account"
+          accessibilityHint={getAccessibilityHint('create a new account')}
+        >
           <Text style={styles.footerLink}>Sign Up</Text>
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity disabled={isLoading} style={styles.forgotPassword}>
+      <TouchableOpacity 
+        disabled={loading} 
+        style={[styles.forgotPassword, touchTargetStyle]}
+        onPress={() => navigation.navigate('ForgotPassword')}
+        accessibilityRole="link"
+        accessibilityLabel="Forgot password"
+        accessibilityHint={getAccessibilityHint('reset your password')}
+      >
         <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
       </TouchableOpacity>
     </ScrollView>

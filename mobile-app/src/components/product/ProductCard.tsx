@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,11 +10,16 @@ import {
 import { useAppTheme } from '../../theme';
 import { Card } from '../card';
 import type { ProductCardProps } from './ProductCard.types';
+import { 
+  formatProductForScreenReader, 
+  getAccessibilityHint, 
+  ensureTouchTarget 
+} from '../../utils/accessibility';
 
 const { width } = Dimensions.get('window');
 const gridItemWidth = (width - 24) / 2;
 
-export const ProductCard: React.FC<ProductCardProps> = ({
+const ProductCardComponent: React.FC<ProductCardProps> = ({
   product,
   onPress,
   variant = 'grid',
@@ -22,6 +27,16 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   isInWishlist = false,
 }) => {
   const theme = useAppTheme();
+
+  const handlePress = useCallback(() => {
+    onPress(product.id);
+  }, [onPress, product.id]);
+
+  const handleWishlistToggle = useCallback(() => {
+    if (onWishlistToggle) {
+      onWishlistToggle(product.id, isInWishlist);
+    }
+  }, [onWishlistToggle, product.id, isInWishlist]);
 
   const discountPercentage = product.discountPrice
     ? Math.round(((parseFloat(product.price) - parseFloat(product.discountPrice)) / parseFloat(product.price)) * 100)
@@ -32,9 +47,18 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     : parseFloat(product.price);
   const originalPrice = parseFloat(product.price);
 
+  const accessibilityLabel = formatProductForScreenReader(product);
+  const touchTargetStyle = ensureTouchTarget(44);
+
   if (variant === 'list') {
     return (
-      <Pressable onPress={() => onPress(product.id)} style={{ marginBottom: theme.spacing.md }}>
+      <Pressable 
+        onPress={handlePress} 
+        style={{ marginBottom: theme.spacing.md }}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        accessibilityHint={getAccessibilityHint('view product details')}
+      >
         {({ pressed }) => (
           <Card
             padding="none"
@@ -43,8 +67,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           >
             {onWishlistToggle && (
               <Pressable
-                style={[styles.heartButton, { top: theme.spacing.sm, left: theme.spacing.sm }]}
-                onPress={() => onWishlistToggle(product.id, isInWishlist)}
+                style={[styles.heartButton, { top: theme.spacing.sm, left: theme.spacing.sm }, touchTargetStyle]}
+                onPress={handleWishlistToggle}
+                accessibilityRole="button"
+                accessibilityLabel={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
+                accessibilityHint={getAccessibilityHint('toggle wishlist')}
               >
                 <View style={[styles.heartBadge, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
                   <Text style={styles.heartIcon}>{isInWishlist ? '❤️' : '🤍'}</Text>
@@ -54,6 +81,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             <Image
               source={{ uri: product.images[0] }}
               style={[styles.listImage, { backgroundColor: theme.colors.surfaceVariant }] as any}
+              resizeMode="cover"
             />
             <View style={[styles.listContent, { padding: theme.spacing.md }]}>
               <Text style={[theme.typography.bodyMedium, { fontWeight: '600', color: theme.colors.onSurface }]} numberOfLines={2}>
@@ -95,7 +123,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   }
 
   return (
-    <Pressable onPress={() => onPress(product.id)}>
+    <Pressable 
+      onPress={handlePress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityHint={getAccessibilityHint('view product details')}
+    >
       {({ pressed }) => (
         <Card
           padding="none"
@@ -104,8 +137,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         >
           {onWishlistToggle && (
             <Pressable
-              style={[styles.heartButton, { top: theme.spacing.sm, left: theme.spacing.sm }]}
-              onPress={() => onWishlistToggle(product.id, isInWishlist)}
+              style={[styles.heartButton, { top: theme.spacing.sm, left: theme.spacing.sm }, touchTargetStyle]}
+              onPress={handleWishlistToggle}
+              accessibilityRole="button"
+              accessibilityLabel={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
+              accessibilityHint={getAccessibilityHint('toggle wishlist')}
             >
               <View style={[styles.heartBadge, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
                 <Text style={styles.heartIcon}>{isInWishlist ? '❤️' : '🤍'}</Text>
@@ -128,6 +164,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             source={{ uri: product.images[0] }}
             style={[styles.gridImage, { backgroundColor: theme.colors.surfaceVariant }] as any}
             defaultSource={require('../../assets/placeholder.png')}
+            resizeMode="cover"
           />
 
           <View style={[styles.gridContent, { padding: theme.spacing.sm }]}>
@@ -169,6 +206,20 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     </Pressable>
   );
 };
+
+// Memoize with custom comparison function
+export const ProductCard = React.memo(
+  ProductCardComponent,
+  (prevProps, nextProps) => {
+    return (
+      prevProps.product.id === nextProps.product.id &&
+      prevProps.variant === nextProps.variant &&
+      prevProps.isInWishlist === nextProps.isInWishlist &&
+      prevProps.product.stockQuantity === nextProps.product.stockQuantity &&
+      prevProps.product.images[0] === nextProps.product.images[0]
+    );
+  }
+);
 
 const styles = StyleSheet.create({
   gridContainer: {

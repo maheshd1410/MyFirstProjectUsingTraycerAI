@@ -1,3 +1,4 @@
+import 'react-native-gesture-handler';
 import React, { useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -8,7 +9,7 @@ import { store, persistor } from './src/store';
 import { RootNavigator } from './src/navigation';
 import { NetworkStatusProvider } from './src/utils/network';
 import { OfflineBanner } from './src/components/OfflineBanner';
-import { CartProvider } from './src/state';
+import { CartProvider, AuthProvider } from './src/state';
 import { theme } from './src/theme';
 
 export default function App() {
@@ -24,15 +25,17 @@ export default function App() {
         }
         persistor={persistor}
       >
-        <CartProvider>
-          <NetworkStatusProvider>
-            <SafeAreaProvider>
-              <StatusBar style="auto" />
-              <OfflineBanner />
-              <RootNavigator navigationRef={navigationRef} />
-            </SafeAreaProvider>
-          </NetworkStatusProvider>
-        </CartProvider>
+        <AuthProvider>
+          <CartProvider>
+            <NetworkStatusProvider>
+              <SafeAreaProvider>
+                <StatusBar style="auto" />
+                <OfflineBanner />
+                <RootNavigator navigationRef={navigationRef} />
+              </SafeAreaProvider>
+            </NetworkStatusProvider>
+          </CartProvider>
+        </AuthProvider>
       </PersistGate>
     </Provider>
   );

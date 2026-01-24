@@ -4,117 +4,63 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
-  Image,
   Alert,
-  ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import * as ImagePicker from 'expo-image-picker';
-import { Ionicons } from '@expo/vector-icons';
-import { Input, Button } from '../../components';
-import { useAuth, useProfile } from '../../hooks';
-import { theme } from '../../theme';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuthContext } from '../../state/auth.context';
+import { TextInput } from '../../components/input/TextInput';
+import { Button } from '../../components/button/Button';
+import { Header } from '../../components/header/Header';
+import { useAppTheme } from '../../theme';
 
-export const EditProfileScreen = () => {
+export const EditProfileScreen: React.FC = () => {
   const navigation = useNavigation();
-  const { user, setUser } = useAuth();
-  const { updateProfile, uploadImage, isLoading, error } = useProfile();
+  const theme = useAppTheme();
+  const { state, updateUser } = useAuthContext();
+  const user = state.user;
 
-  const [firstName, setFirstName] = useState(user?.firstName || '');
-  const [lastName, setLastName] = useState(user?.lastName || '');
-  const [phoneNumber, setPhoneNumber] = useState(user?.phoneNumber || '');
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [name, setName] = useState(user?.name || '');
+  const [nameError, setNameError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (user) {
-      setFirstName(user.firstName);
-      setLastName(user.lastName);
-      setPhoneNumber(user.phoneNumber);
+      setName(user.name);
     }
   }, [user]);
 
-  const requestPermissions = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert(
-        'Permission Required',
-        'Please grant permission to access your photo library to upload a profile image.'
-      );
+  const validateForm = (): boolean => {
+    if (!name.trim()) {
+      setNameError('Name is required');
       return false;
     }
+    if (name.trim().length < 2) {
+      setNameError('Name must be at least 2 characters');
+      return false;
+    }
+    setNameError('');
     return true;
   };
 
-  const handleImagePick = async () => {
-    const hasPermission = await requestPermissions();
-    if (!hasPermission) return;
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets[0]) {
-      setSelectedImage(result.assets[0].uri);
-    }
-  };
-
-  const validateForm = (): boolean => {
-    const newErrors: { [key: string]: string } = {};
-
-    if (!firstName.trim()) {
-      newErrors.firstName = 'First name is required';
-    } else if (firstName.trim().length < 2) {
-      newErrors.firstName = 'First name must be at least 2 characters';
-    }
-
-    if (!lastName.trim()) {
-      newErrors.lastName = 'Last name is required';
-    } else if (lastName.trim().length < 2) {
-      newErrors.lastName = 'Last name must be at least 2 characters';
-    }
-
-    if (!phoneNumber.trim()) {
-      newErrors.phoneNumber = 'Phone number is required';
-    } else if (!/^[\d\s\-\+\(\)]+$/.test(phoneNumber)) {
-      newErrors.phoneNumber = 'Invalid phone number format';
-    } else if (phoneNumber.length < 10) {
-      newErrors.phoneNumber = 'Phone number must be at least 10 digits';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async () => {
+  const handleSave = async () => {
     if (!validateForm()) {
       return;
     }
 
     try {
-      // Upload image first if selected
-      if (selectedImage) {
-        const updatedUser = await uploadImage(selectedImage);
-        setUser(updatedUser);
-      }
-
-      // Update profile fields
-      const updatedUser = await updateProfile({
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        phoneNumber: phoneNumber.trim(),
-      });
-
-      setUser(updatedUser);
+      setIsSaving(true);
+      updateUser({ name: name.trim() });
       Alert.alert('Success', 'Profile updated successfully', [
-        { text: 'OK', onPress: () => navigation.goBack() },
+        {
+          text: 'OK',
+          onPress: () => navigation.goBack(),
+        },
       ]);
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to update profile');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update profile');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -122,168 +68,114 @@ export const EditProfileScreen = () => {
     navigation.goBack();
   };
 
-  if (!user) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.errorText}>Please login to edit your profile</Text>
-      </View>
-    );
-  }
-
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      {/* Profile Image Section */}
-      <View style={styles.imageSection}>
-        <View style={styles.imageContainer}>
-          {selectedImage || user.profileImage ? (
-            <Image
-              source={{ uri: selectedImage || user.profileImage }}
-              style={styles.profileImage}
-            />
-          ) : (
-            <View style={styles.profileImagePlaceholder}>
-              <Ionicons name="person" size={60} color={theme.colors.textLight} />
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <Header title="Edit Profile" />
+      
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.formSection}>
+          <TextInput
+            label="Full Name"
+            value={name}
+            onChangeText={(text) => {
+              setName(text);
+              if (nameError) setNameError('');
+            }}
+            placeholder="Enter your full name"
+            editable={!isSaving}
+          />
+          {nameError ? (
+            <Text style={[styles.errorText, { color: theme.colors.error }]}>
+              {nameError}
+            </Text>
+          ) : null}
+
+          <View style={styles.disabledSection}>
+            <Text style={[styles.disabledLabel, { color: theme.colors.onSurfaceVariant }]}>
+              Email
+            </Text>
+            <View
+              style={[
+                styles.disabledInput,
+                { backgroundColor: theme.colors.surfaceVariant },
+              ]}
+            >
+              <Text style={[styles.disabledText, { color: theme.colors.onSurfaceVariant }]}>
+                {user?.email}
+              </Text>
             </View>
-          )}
+            <Text style={[styles.helperText, { color: theme.colors.onSurfaceVariant }]}>
+              Email cannot be changed
+            </Text>
+          </View>
         </View>
-        <TouchableOpacity style={styles.changePhotoButton} onPress={handleImagePick}>
-          <Ionicons name="camera" size={20} color={theme.colors.primary} />
-          <Text style={styles.changePhotoText}>Change Photo</Text>
-        </TouchableOpacity>
-      </View>
 
-      {/* Form Fields */}
-      <View style={styles.formSection}>
-        <Input
-          label="First Name"
-          value={firstName}
-          onChangeText={setFirstName}
-          placeholder="Enter your first name"
-          error={errors.firstName}
-        />
+        <View style={styles.buttonSection}>
+          <Button
+            label={isSaving ? 'Saving...' : 'Save Changes'}
+            onPress={handleSave}
+            disabled={isSaving || !name.trim()}
+            variant="filled"
+            fullWidth
+          />
 
-        <Input
-          label="Last Name"
-          value={lastName}
-          onChangeText={setLastName}
-          placeholder="Enter your last name"
-          error={errors.lastName}
-        />
-
-        <Input
-          label="Phone Number"
-          value={phoneNumber}
-          onChangeText={setPhoneNumber}
-          placeholder="Enter your phone number"
-          keyboardType="phone-pad"
-          error={errors.phoneNumber}
-        />
-
-        <Input
-          label="Email"
-          value={user.email}
-          editable={false}
-          placeholder="Email cannot be changed"
-        />
-      </View>
-
-      {/* Error Message */}
-      {error && (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
+          <Button
+            label="Cancel"
+            onPress={handleCancel}
+            disabled={isSaving}
+            variant="outlined"
+            fullWidth
+          />
         </View>
-      )}
-
-      {/* Action Buttons */}
-      <View style={styles.buttonContainer}>
-        <Button
-          title={isLoading ? 'Saving...' : 'Save Changes'}
-          onPress={handleSubmit}
-          disabled={isLoading}
-        />
-        <Button
-          title="Cancel"
-          onPress={handleCancel}
-          variant="secondary"
-          disabled={isLoading}
-        />
-      </View>
-
-      {isLoading && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-        </View>
-      )}
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
   },
-  contentContainer: {
-    padding: theme.spacing.lg,
-    paddingBottom: theme.spacing.xl,
-  },
-  errorText: {
-    fontSize: theme.typography.fontSizes.base,
-    color: theme.colors.error,
-    textAlign: 'center',
-  },
-  imageSection: {
-    alignItems: 'center',
-    marginBottom: theme.spacing.xl,
-  },
-  imageContainer: {
-    marginBottom: theme.spacing.md,
-  },
-  profileImage: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    borderWidth: 3,
-    borderColor: theme.colors.primary,
-  },
-  profileImagePlaceholder: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: theme.colors.surface,
-    borderWidth: 2,
-    borderColor: theme.colors.border,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  changePhotoButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-  },
-  changePhotoText: {
-    fontSize: theme.typography.fontSizes.base,
-    color: theme.colors.primary,
-    marginLeft: theme.spacing.sm,
-    fontWeight: '500' as any,
+  content: {
+    flexGrow: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 24,
+    justifyContent: 'space-between',
   },
   formSection: {
-    marginBottom: theme.spacing.lg,
+    marginBottom: 24,
   },
-  errorContainer: {
-    backgroundColor: theme.colors.error + '20',
-    padding: theme.spacing.md,
+  errorText: {
+    fontSize: 12,
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  disabledSection: {
+    marginTop: 16,
+  },
+  disabledLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  disabledInput: {
     borderRadius: 8,
-    marginBottom: theme.spacing.lg,
-  },
-  buttonContainer: {
-    gap: theme.spacing.md,
-  },
-  loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    paddingHorizontal: 12,
+    paddingVertical: 14,
+    minHeight: 48,
     justifyContent: 'center',
-    alignItems: 'center',
+  },
+  disabledText: {
+    fontSize: 16,
+  },
+  helperText: {
+    fontSize: 12,
+    marginTop: 4,
+  },
+  buttonSection: {
+    gap: 12,
+  },
+  button: {
+    width: '100%',
   },
 });

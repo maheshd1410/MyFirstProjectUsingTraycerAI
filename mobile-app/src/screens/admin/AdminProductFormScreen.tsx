@@ -460,3 +460,4 @@ const styles = StyleSheet.create({
     fontWeight: theme.typography.fontWeights.semibold as any,
     color: theme.colors.primary,
   },
+});

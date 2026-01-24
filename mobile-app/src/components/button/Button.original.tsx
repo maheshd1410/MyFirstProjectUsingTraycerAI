@@ -1,21 +1,10 @@
 import React from 'react';
-import { Pressable, Text, ActivityIndicator, View } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withSpring,
-} from 'react-native-reanimated';
+import { Pressable, Text, ActivityIndicator, View, StyleSheet } from 'react-native';
 import { useAppTheme } from '../../theme';
-import { ensureTouchTarget, getButtonAccessibilityLabel, getAccessibilityHint } from '../../utils/accessibility';
 import type { ButtonProps } from './Button.types';
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export const Button: React.FC<ButtonProps> = ({
   label,
-  children,
-  title,
   onPress,
   variant = 'filled',
   loading = false,
@@ -23,15 +12,9 @@ export const Button: React.FC<ButtonProps> = ({
   fullWidth = false,
   leadingIcon,
   trailingIcon,
-  style,
   accessibilityLabel,
-  accessibilityHint,
 }) => {
-  // Support multiple API patterns: label (new), children (old), title (old)
-  const buttonText = label || title || (typeof children === 'string' ? children : '');
   const theme = useAppTheme();
-  const scale = useSharedValue(1);
-  const opacity = useSharedValue(1);
 
   const getBackgroundColor = () => {
     if (variant === 'filled') return theme.colors.primary;
@@ -63,9 +46,7 @@ export const Button: React.FC<ButtonProps> = ({
       borderColor: getBorderColor(),
       opacity: disabled ? theme.opacity.disabled : 1,
       width: fullWidth ? '100%' : 'auto',
-      ...ensureTouchTarget(44),
     },
-    style,
   ];
 
   const textStyle = [
@@ -76,63 +57,41 @@ export const Button: React.FC<ButtonProps> = ({
     },
   ];
 
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ scale: scale.value }],
-      opacity: opacity.value,
-    };
-  });
-
-  const handlePressIn = () => {
-    scale.value = withSpring(0.95, { damping: 10, stiffness: 100 });
-  };
-
-  const handlePressOut = () => {
-    scale.value = withSpring(1, { damping: 10, stiffness: 100 });
-  };
-
-  // Animate loading state transition
-  React.useEffect(() => {
-    opacity.value = withTiming(loading ? 0.7 : 1, { duration: 200 });
-  }, [loading, opacity]);
-
-  const state = loading ? 'loading' : disabled ? 'disabled' : undefined;
-
   return (
-    <AnimatedPressable
+    <Pressable
       onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
       disabled={disabled || loading}
       accessible
       accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel || getButtonAccessibilityLabel(buttonText, state)}
-      accessibilityHint={accessibilityHint}
-      accessibilityState={{ disabled: disabled || loading, busy: loading }}
-      style={[containerStyle, animatedStyle]}
+      accessibilityLabel={accessibilityLabel || label}
+      accessibilityState={{ disabled: disabled || loading }}
+      style={({ pressed }) => [
+        containerStyle,
+        {
+          opacity: pressed && !disabled ? (disabled ? theme.opacity.disabled : theme.opacity.pressed) : disabled ? theme.opacity.disabled : 1,
+        },
+      ]}
     >
       {loading ? (
         <ActivityIndicator
           size="small"
           color={getTextColor()}
         />
-      ) : buttonText ? (
+      ) : (
         <>
           {leadingIcon && (
             <View style={{ marginRight: theme.spacing.sm }}>
               {leadingIcon}
             </View>
           )}
-          <Text style={textStyle}>{buttonText}</Text>
+          <Text style={textStyle}>{label}</Text>
           {trailingIcon && (
             <View style={{ marginLeft: theme.spacing.sm }}>
               {trailingIcon}
             </View>
           )}
         </>
-      ) : (
-        children
       )}
-    </AnimatedPressable>
+    </Pressable>
   );
 };

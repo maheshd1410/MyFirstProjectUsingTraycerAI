@@ -1069,3 +1069,4 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.fontSizes.xs,
     color: theme.colors.text,
   },
+});

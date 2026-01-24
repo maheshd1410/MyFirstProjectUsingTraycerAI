@@ -24,8 +24,6 @@ import { generalLimiter, authLimiter, apiLimiter } from './middleware/rateLimite
 import { requestLogger, responseLogger } from './middleware/logger';
 import { notFound } from './middleware/notFound';
 import { errorHandler } from './middleware/errorHandler';
-import { isRedisConnected } from './config/redis';
-import { prisma } from './config/database';
 
 const app = express();
 
@@ -125,33 +123,12 @@ app.use('/api/profile', apiLimiter, profileRoutes);
 app.use('/api/admin', apiLimiter, adminRoutes);
 
 // Health check endpoint
-app.get('/health', async (req, res) => {
-  try {
-    // Check database connection
-    await prisma.$queryRaw`SELECT 1`;
-    const dbStatus = 'connected';
-    const redisStatus = isRedisConnected() ? 'connected' : 'disconnected';
-
-    res.json({
-      status: 'ok',
-      message: 'Ladoo Business API is running',
-      services: {
-        database: dbStatus,
-        redis: redisStatus,
-      },
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    res.status(503).json({
-      status: 'error',
-      message: 'Service unavailable',
-      services: {
-        database: 'disconnected',
-        redis: isRedisConnected() ? 'connected' : 'disconnected',
-      },
-      timestamp: new Date().toISOString(),
-    });
-  }
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    message: 'Ladoo Business API is running',
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // 404 handler for undefined routes

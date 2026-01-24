@@ -8,5 +8,7 @@ export interface TextInputProps extends RNTextInputProps {
   error?: string;
   helperText?: string;
   disabled?: boolean;
+  required?: boolean;
   accessibilityLabel?: string;
+  accessibilityHint?: string;
 }
