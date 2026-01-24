@@ -28,7 +28,7 @@
     "@stripe/stripe-react-native": "^0.18.0",
     "axios": "^1.0.0",
     "axios-retry": "^4.5.0",
-    "expo": "~48.0.0",
+    "expo": "~54.0.32",
     "expo-auth-session": "^7.0.10",
     "expo-constants": "~14.2.0",
     "expo-crypto": "^15.0.8",
